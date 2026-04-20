@@ -91,6 +91,7 @@ function AssetList() {
       propertyNumber: newAsset.propertyNumber,
       dateAcquired: newAsset.dateAcquired,
       officeDescription: newAsset.officeDescription || '',
+      accountableOfficer: newAsset.accountableOfficer || '',
       ppeClass: newAsset.ppeClass,
       accountCode: newAsset.accountCode || '',
       usefulLife: newAsset.usefulLife || '',
@@ -110,19 +111,24 @@ function AssetList() {
 
   const exportToCSV = () => {
     const csvContent = [
-      ['Property Number', 'PPE Class', 'Office', 'Status', 'Total Cost', 'Accumulated Depreciation', 'Net Book Value', 'Date Acquired', 'Useful Life', 'Depreciation Amount', 'Annual Depreciation'],
+      ['Property Number', 'Date Acquired', 'Office Description', 'Accountable Officer/End-user', 'PPE Class', 'Account Code', 'Useful Life (yrs)', 'Status', 'Unit Cost', 'Total Cost', 'Residual', 'Depreciate Amount', 'Annual Depreciate', 'Accumulated Depreciate', 'Net Book', 'Remarks'],
       ...filteredAssets.map(asset => [
         asset.propertyNumber,
-        asset.ppeClass,
-        asset.office,
-        asset.status,
-        asset.totalCost,
-        asset.accumulatedDepreciation,
-        asset.netbookValue,
         asset.dateAcquired,
-        asset.usefulLife,
-        asset.depreciationAmount,
-        asset.annualDepreciation
+        asset.officeDescription || 'N/A',
+        asset.accountableOfficer || 'N/A',
+        asset.ppeClass,
+        asset.accountCode || 'N/A',
+        asset.usefulLife ? `${asset.usefulLife} years` : 'N/A',
+        asset.status,
+        asset.unitCost || 0,
+        asset.totalCost,
+        asset.residual || 0,
+        asset.depreciationAmount || 0,
+        asset.annualDepreciation || 0,
+        asset.accumulatedDepreciation || 0,
+        asset.netbookValue || 0,
+        asset.remarks || 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -183,7 +189,7 @@ function AssetList() {
             }}
             className="denr-button flex items-center space-x-2"
           >
-            <span className="text-white">+ Add Asset</span>
+            <span className="text-white">+ Add Property</span>
           </button>
           
           <select
@@ -269,7 +275,7 @@ function AssetList() {
 
       {/* Assets Table */}
       <div className="denr-card">
-        <h3 className="text-lg font-semibold text-denr-green mb-4">Asset List</h3>
+        <h3 className="text-lg font-semibold text-denr-green mb-4">Property List</h3>
         <div className="overflow-x-auto">
           <div className="min-w-[1500px]">
             <table className="w-full divide-y divide-gray-200 text-xs">
@@ -283,6 +289,9 @@ function AssetList() {
                   </th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Office Description
+                  </th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Accountable Officer/End-user
                   </th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     PPE CLASS
@@ -336,6 +345,9 @@ function AssetList() {
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                       {asset.officeDescription || 'N/A'}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
+                      {asset.accountableOfficer || 'N/A'}
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                       {asset.ppeClass}

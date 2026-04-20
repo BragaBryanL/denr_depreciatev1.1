@@ -1,0 +1,64 @@
+import React, { useEffect } from 'react';
+import { X, FileText } from 'lucide-react';
+
+function Modal({ isOpen, onClose, title, children }) {
+  // Handle ESC key press
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  // Handle click outside modal
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4"
+      onClick={handleBackdropClick}
+    >
+      <div 
+        className="bg-gradient-to-br from-white to-green-50 border-l-4 border-denr-green rounded-lg shadow-2xl w-fit max-w-6xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-denr-green/5 to-green-50">
+          <h2 className="text-xl font-bold text-denr-green flex items-center">
+            <span className="bg-denr-green text-white p-2 rounded-lg mr-3">
+              <FileText className="w-5 h-5" />
+            </span>
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-lg hover:bg-red-50"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        {/* Modal Body */}
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Modal;
