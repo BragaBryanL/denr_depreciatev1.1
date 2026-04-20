@@ -62,6 +62,7 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
     residual: '',
     depreciationAmount: '',
     annualDepreciation: '',
+    rateOfDepreciation: '',
     accumulatedDepreciation: '',
     netbookValue: '',
   });
@@ -114,9 +115,13 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
     let annualDepreciation = 0;
     let accumulatedDepreciation = 0;
     let netBookValue = totalCost;
+    let rateOfDepreciation = 0;
     
     if (usefulLifeYears > 0 && usefulLife !== 'Indefinite') {
       annualDepreciation = depreciationAmount / usefulLifeYears;
+      
+      // Calculate rate of depreciation (as percentage)
+      rateOfDepreciation = usefulLifeYears > 0 ? (annualDepreciation / totalCost) * 100 : 0;
       
       // Calculate accumulated depreciation based on date acquired
       if (formData.dateAcquired) {
@@ -133,6 +138,7 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
       residual: residualValue.toFixed(2),
       depreciationAmount: depreciationAmount.toFixed(2),
       annualDepreciation: annualDepreciation.toFixed(2),
+      rateOfDepreciation: rateOfDepreciation.toFixed(2),
       accumulatedDepreciation: accumulatedDepreciation.toFixed(2),
       netbookValue: netBookValue.toFixed(2),
     });
@@ -181,6 +187,7 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
       residual: '',
       depreciationAmount: '',
       annualDepreciation: '',
+      rateOfDepreciation: '',
       accumulatedDepreciation: '',
       netbookValue: '',
     });
@@ -418,6 +425,13 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
             <span className="text-gray-700">Annual Depreciation</span>
             <span className="font-semibold text-denr-green">
               ₱ {parseFloat(calculatedValues.annualDepreciation || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          
+          <div className="flex justify-between items-center p-3 bg-white rounded border">
+            <span className="text-gray-700">Rate of Depreciation</span>
+            <span className="font-semibold text-denr-green">
+              {parseFloat(calculatedValues.rateOfDepreciation || 0).toFixed(2)}%
             </span>
           </div>
           
