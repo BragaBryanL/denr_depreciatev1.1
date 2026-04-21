@@ -1,54 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Save, X, Edit, Trash2, Search, Filter, Download, Calculator, FileText, Upload } from 'lucide-react';
 import AssetForm from './AssetForm.jsx';
 import Modal from './Modal.jsx';
+import Toast from './Toast.jsx';
+import * as XLSX from 'xlsx';
 
 function Properties() {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [assets, setAssets] = useState([
-    {
-      id: '1',
-      propertyNumber: 'IM-P177-2005-90-50',
-      officePlace: 'PENRO',
-      propertyDescription: 'Main office building with administrative facilities',
-      accountableOfficer: 'Juan Dela Cruz',
-      ppeClass: 'Buildings',
-      accountCode: '10604010',
-      dateAcquired: '2015/02/02',
-      cost: 545000,
-      residualValue: 27250,
-      usefulLife: '20',
-      depreciableAmount: 517750,
-      annualDepreciation: 25887.5,
-      accumulatedDepreciation: 192651.07,
-      netBookValue: 352348.93,
-      remarks: 'Primary administrative office',
-      status: 'Serviceable'
-    }
-  ]);
+  const [editingAsset, setEditingAsset] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [assets, setAssets] = useState(() => {
+    const savedAssets = localStorage.getItem('denr_assets');
+    return savedAssets ? JSON.parse(savedAssets) : [];
+  });
+
+  // Save assets to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('denr_assets', JSON.stringify(assets));
+  }, [assets]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
   const handleAddAsset = (newAsset) => {
-    const assetWithId = {
-      ...newAsset,
-      id: Date.now().toString(),
-      accountableOfficer: newAsset.accountableOfficer || ''
-    };
-    setAssets(prev => [...prev, assetWithId]);
+    if (editingAsset) {
+      // Update existing asset
+      setAssets(prev => prev.map(asset => 
+        asset.id === editingAsset.id 
+          ? {
+              ...asset,
+              propertyNumber: newAsset.propertyNumber,
+              officePlace: newAsset.office || '',
+              propertyDescription: newAsset.officeDescription || '',
+              accountableOfficer: newAsset.accountableOfficer || '',
+              ppeClass: newAsset.ppeClass,
+              accountCode: newAsset.accountCode,
+              dateAcquired: newAsset.dateAcquired,
+              cost: parseFloat(newAsset.totalCost) || 0,
+              residualValue: parseFloat(newAsset.residual) || 0,
+              usefulLife: newAsset.usefulLife,
+              depreciableAmount: parseFloat(newAsset.depreciationAmount) || 0,
+              annualDepreciation: parseFloat(newAsset.annualDepreciation) || 0,
+              accumulatedDepreciation: parseFloat(newAsset.accumulatedDepreciation) || 0,
+              netBookValue: parseFloat(newAsset.netbookValue) || 0,
+              remarks: newAsset.remarks || '',
+              status: newAsset.status
+            }
+          : asset
+      ));
+      setEditingAsset(null);
+    } else {
+      // Add new asset
+      const assetWithId = {
+        id: Date.now().toString(),
+        propertyNumber: newAsset.propertyNumber,
+        officePlace: newAsset.office || '',
+        propertyDescription: newAsset.officeDescription || '',
+        accountableOfficer: newAsset.accountableOfficer || '',
+        ppeClass: newAsset.ppeClass,
+        accountCode: newAsset.accountCode,
+        dateAcquired: newAsset.dateAcquired,
+        cost: parseFloat(newAsset.totalCost) || 0,
+        residualValue: parseFloat(newAsset.residual) || 0,
+        usefulLife: newAsset.usefulLife,
+        depreciableAmount: parseFloat(newAsset.depreciationAmount) || 0,
+        annualDepreciation: parseFloat(newAsset.annualDepreciation) || 0,
+        accumulatedDepreciation: parseFloat(newAsset.accumulatedDepreciation) || 0,
+        netBookValue: parseFloat(newAsset.netbookValue) || 0,
+        remarks: newAsset.remarks || '',
+        status: newAsset.status
+      };
+      setAssets(prev => [...prev, assetWithId]);
+    }
     setShowAddForm(false);
+    // Dispatch custom event for real-time updates
+    window.dispatchEvent(new CustomEvent('denrDataChanged'));
   };
 
   const handleEdit = (asset) => {
-    console.log('Edit asset:', asset);
-    // TODO: Implement edit functionality
+    setEditingAsset(asset);
+    setShowAddForm(true);
   };
 
   const handleDelete = (asset) => {
     console.log('Delete asset:', asset);
     setAssets(prev => prev.filter(a => a.id !== asset.id));
+    // Dispatch custom event for real-time updates
+    window.dispatchEvent(new CustomEvent('denrDataChanged'));
   };
 
   const handleGenerateCOA = (asset) => {
@@ -61,19 +100,143 @@ function Properties() {
     setAssets(prev => prev.map(a => 
       a.id === asset.id ? { ...a, status: newStatus } : a
     ));
+    // Dispatch custom event for real-time updates
+    window.dispatchEvent(new CustomEvent('denrDataChanged'));
   };
 
   const handleImportFile = () => {
     // Create file input element
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.xlsx,.xls';
+    input.accept = '.csv,.xlsx,.xls,.pdf,.doc,.docx,.txt';
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
-        console.log('Import file selected:', file.name);
-        // TODO: Implement file import logic
-        alert(`File "${file.name}" selected for import. Import functionality will be implemented.`);
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        
+        if (fileExtension === 'csv' || fileExtension === 'txt') {
+          // Handle CSV and TXT files
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const text = event.target.result;
+            const lines = text.split('\n');
+            
+            const importedAssets = [];
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i].trim()) {
+                const values = lines[i].split(',').map(v => v.trim());
+                const asset = {
+                  id: Date.now().toString() + i,
+                  propertyNumber: values[0] || '',
+                  officePlace: values[1] || '',
+                  propertyDescription: values[2] || '',
+                  accountableOfficer: values[3] || '',
+                  ppeClass: values[4] || '',
+                  accountCode: values[5] || '',
+                  dateAcquired: values[6] || '',
+                  cost: parseFloat(values[7]) || 0,
+                  residualValue: parseFloat(values[8]) || 0,
+                  usefulLife: values[9] || '',
+                  depreciableAmount: parseFloat(values[10]) || 0,
+                  annualDepreciation: parseFloat(values[11]) || 0,
+                  accumulatedDepreciation: parseFloat(values[12]) || 0,
+                  netBookValue: parseFloat(values[13]) || 0,
+                  remarks: values[14] || '',
+                  status: values[15] || 'Serviceable'
+                };
+                importedAssets.push(asset);
+              }
+            }
+            
+            if (importedAssets.length > 0) {
+              setAssets(prev => [...prev, ...importedAssets]);
+              window.dispatchEvent(new CustomEvent('denrDataChanged'));
+              setToast({ message: `Successfully imported ${importedAssets.length} properties from ${file.name}`, type: 'success' });
+            } else {
+              setToast({ message: 'No valid properties found in the file. Please check the file format.', type: 'error' });
+            }
+          };
+          reader.readAsText(file);
+        } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+          // Handle Excel files using xlsx library
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            
+            // Log first row to debug column names
+            if (jsonData.length > 0) {
+              console.log('Excel columns:', Object.keys(jsonData[0]));
+            }
+            
+            const importedAssets = jsonData.map((row, index) => {
+              // Try to get property number from various possible column names
+              const propertyNumber = row['Property No.'] || row['Property Number'] || row['PropertyNumber'] || row['propertyNumber'] || 
+                                    row['PROP NO'] || row['Property_No'] || row['PropNumber'] || row['PROP_NO'] ||
+                                    row['Property No'] || row['property_no'] || '';
+              
+              // Get office/place
+              const office = row['Office/Place'] || row['OfficePlace'] || row['Office'] || row['officePlace'] || 
+                            row['Office Place'] || row['OFFICE'] || '';
+              
+              // Get date acquired and handle format conversion
+              let dateAcquired = row['Date Acquired'] || row['DateAcquired'] || row['Date_Acquired'] || row['dateAcquired'] || row['Date'] || '';
+              if (dateAcquired && typeof dateAcquired === 'string') {
+                // Convert MM/DD/YYYY to YYYY/MM/DD if needed
+                const dateParts = dateAcquired.split('/');
+                if (dateParts.length === 3) {
+                  const [month, day, year] = dateParts;
+                  if (year.length === 4) {
+                    dateAcquired = `${year}/${month}/${day}`;
+                  }
+                }
+              } else if (dateAcquired && typeof dateAcquired !== 'string') {
+                // If it's a date object, convert to string
+                dateAcquired = String(dateAcquired);
+              }
+              
+              return {
+                id: Date.now().toString() + index,
+                propertyNumber: propertyNumber || `AUTO-${Date.now()}-${index}`,
+                officePlace: office,
+                propertyDescription: row['Property Description'] || row['PropertyDescription'] || row['Description'] || row['propertyDescription'] || row['Property Desc'] || '',
+                accountableOfficer: row['Accountable Officer'] || row['AccountableOfficer'] || row['Accountable_Officer'] || row['accountableOfficer'] || row['Accountable Off'] || '',
+                ppeClass: row['PPE Class'] || row['PPEClass'] || row['PPE'] || row['ppeClass'] || row['PPE Class'] || row['CLASS'] || '',
+                accountCode: row['Account Code'] || row['AccountCode'] || row['Account_Code'] || row['accountCode'] || row['Account Code'] || row['ACCOUNT CODE'] || '',
+                dateAcquired: dateAcquired,
+                cost: parseFloat(row['Cost'] || row['cost'] || row['COST'] || row['Total Cost'] || row['TOTAL COST'] || 0),
+                residualValue: parseFloat(row['Residual Value'] || row['ResidualValue'] || row['Residual_Value'] || row['residualValue'] || row['RESIDUAL VALUE'] || 0),
+                usefulLife: row['Useful Life (Years)'] || row['Useful Life'] || row['UsefulLife'] || row['Useful_Life'] || row['usefulLife'] || row['USEFUL LIFE'] || '',
+                depreciableAmount: parseFloat(row['Depreciable Amount'] || row['DepreciableAmount'] || row['Depreciable_Amount'] || row['depreciableAmount'] || row['DEPRECIABLE AMOUNT'] || 0),
+              annualDepreciation: parseFloat(row['Annual Depreciation'] || row['AnnualDepreciation'] || row['Annual_Depreciation'] || row['annualDepreciation'] || row['ANNUAL DEPRECIATION'] || 0),
+              accumulatedDepreciation: parseFloat(row['Accumulated Depreciation'] || row['AccumulatedDepreciation'] || row['Accumulated_Depreciation'] || row['accumulatedDepreciation'] || row['ACCUMULATED DEPRECIATION'] || 0),
+              netBookValue: parseFloat(row['Net Book Value'] || row['NetBookValue'] || row['Net_Book_Value'] || row['netBookValue'] || row['NET BOOK VALUE'] || 0),
+              remarks: row['REM ARKS'] || row['REMARKS'] || row['Remarks'] || row['remarks'] || row['REMARK'] || '',
+              status: row['Status'] || row['status'] || 'Serviceable'
+            };
+            });
+            
+            if (importedAssets.length > 0) {
+              setAssets(prev => [...prev, ...importedAssets]);
+              window.dispatchEvent(new CustomEvent('denrDataChanged'));
+              setToast({ message: `Successfully imported ${importedAssets.length} properties from ${file.name}`, type: 'success' });
+            } else {
+              setToast({ message: 'No valid properties found in the Excel file. Please check the file format.', type: 'error' });
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        } else if (fileExtension === 'pdf') {
+          // PDF files require additional library (pdf-parse or pdf.js)
+          setToast({ message: 'PDF file import requires additional libraries. Please convert the file to CSV format for import.', type: 'warning' });
+        } else if (fileExtension === 'doc' || fileExtension === 'docx') {
+          // Word files require additional library (mammoth.js)
+          setToast({ message: 'Word file import requires additional libraries. Please convert the file to CSV format for import.', type: 'warning' });
+        } else {
+          setToast({ message: 'Unsupported file format. Please use CSV, TXT, Excel, or convert your file to CSV format.', type: 'error' });
+        }
       }
     };
     input.click();
@@ -152,9 +315,23 @@ function Properties() {
             />
           </div>
           <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="denr-input">
-            <option value="all">All Categories</option>
-            <option value="Buildings">Buildings</option>
+            <option value="all">All PPE Classes</option>
             <option value="Land">Land</option>
+            <option value="Land Improvements, Reforestation Projects">Land Improvements, Reforestation Projects</option>
+            <option value="Other Land Improvements">Other Land Improvements</option>
+            <option value="Water Supply Systems">Water Supply Systems</option>
+            <option value="Power Supply Systems">Power Supply Systems</option>
+            <option value="Buildings">Buildings</option>
+            <option value="Other Structures">Other Structures</option>
+            <option value="Office Equipment">Office Equipment</option>
+            <option value="Information and Communication Technology Equipment">Information and Communication Technology Equipment</option>
+            <option value="Communication Equipment">Communication Equipment</option>
+            <option value="Technical and Scientific Equipment">Technical and Scientific Equipment</option>
+            <option value="Motor Vehicles">Motor Vehicles</option>
+            <option value="Furniture and Fixtures">Furniture and Fixtures</option>
+            <option value="Construction in Progress - Land Improvements">Construction in Progress - Land Improvements</option>
+            <option value="Construction in Progress - Buildings and Other Structures">Construction in Progress - Buildings and Other Structures</option>
+            <option value="Disaster Response and Rescue Equipment">Disaster Response and Rescue Equipment</option>
           </select>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="denr-input">
             <option value="all">All Status</option>
@@ -167,12 +344,19 @@ function Properties() {
       {/* Add Property Modal */}
       <Modal 
         isOpen={showAddForm} 
-        onClose={() => setShowAddForm(false)}
-        title="Add New Property"
+        onClose={() => {
+          setShowAddForm(false);
+          setEditingAsset(null);
+        }}
+        title={editingAsset ? 'Edit Property' : 'Add New Property'}
       >
         <AssetForm 
           isVisible={showAddForm} 
-          onClose={() => setShowAddForm(false)}
+          editingAsset={editingAsset}
+          onClose={() => {
+            setShowAddForm(false);
+            setEditingAsset(null);
+          }}
           onAddAsset={handleAddAsset}
         />
       </Modal>
@@ -264,6 +448,15 @@ function Properties() {
           </table>
         </div>
       </div>
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={3000}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
