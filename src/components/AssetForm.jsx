@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Save, X, Calculator, FileText, Building, Landmark, Car, Laptop, Server, Phone, Wrench, Home, TreePine, Droplets, Zap, Briefcase, Shield, Package, CheckCircle2, XCircle } from 'lucide-react';
-import CustomDropdown from './CustomDropdown.jsx';
 
 const offices = [
   'PENRO',
@@ -334,16 +333,19 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
           </div>
 
           <div>
-            <CustomDropdown
+            <label className="block text-sm font-medium text-gray-700 mb-1">PPE Class</label>
+            <select
+              name="ppeClass"
               value={formData.ppeClass}
-              onChange={(value) => handleInputChange({ target: { name: 'ppeClass', value } })}
-              options={ppeClasses.map(ppe => ppe.name)}
-              placeholder="Select PPE Class"
-              label="PPE Class"
-              searchable={true}
-              iconMap={ppeClassIconMap}
+              onChange={handleInputChange}
+              className="denr-input w-full"
               required
-            />
+            >
+              <option value="">Select PPE Class</option>
+              {ppeClasses.map((ppe, index) => (
+                <option key={index} value={ppe.name}>{ppe.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -371,34 +373,46 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
           </div>
 
           <div>
-            <CustomDropdown
+            <label className="block text-sm font-medium text-gray-700 mb-1">Office</label>
+            <select
+              name="office"
               value={formData.office}
-              onChange={(value) => handleInputChange({ target: { name: 'office', value } })}
-              options={offices}
-              placeholder="Select Office"
-              label="Office"
-            />
+              onChange={handleInputChange}
+              className="denr-input w-full"
+            >
+              <option value="">Select Office</option>
+              {offices.map((office, index) => (
+                <option key={index} value={office}>{office}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <CustomDropdown
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fund Cluster</label>
+            <select
+              name="fundCluster"
               value={formData.fundCluster}
-              onChange={(value) => handleInputChange({ target: { name: 'fundCluster', value } })}
-              options={fundClusters}
-              placeholder="Select Fund Cluster"
-              label="Fund Cluster"
-            />
+              onChange={handleInputChange}
+              className="denr-input w-full"
+            >
+              <option value="">Select Fund Cluster</option>
+              {fundClusters.map((cluster, index) => (
+                <option key={index} value={cluster}>{cluster}</option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <CustomDropdown
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              name="status"
               value={formData.status}
-              onChange={(value) => handleInputChange({ target: { name: 'status', value } })}
-              options={['Serviceable', 'Unserviceable']}
-              placeholder="Select Status"
-              label="Status"
-              iconMap={statusIconMap}
-            />
+              onChange={handleInputChange}
+              className="denr-input w-full"
+            >
+              <option value="Serviceable">Serviceable</option>
+              <option value="Unserviceable">Unserviceable</option>
+            </select>
           </div>
 
           <div>

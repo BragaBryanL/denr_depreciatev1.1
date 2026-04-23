@@ -4,6 +4,7 @@ import AssetForm from './AssetForm.jsx';
 import Modal from './Modal.jsx';
 import Toast from './Toast.jsx';
 import CustomDropdown from './CustomDropdown.jsx';
+import ConfirmationDialog from './ConfirmationDialog.jsx';
 import * as XLSX from 'xlsx';
 
 function Properties() {
@@ -55,6 +56,11 @@ function Properties() {
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    asset: null,
+    isBulk: false
+  });
 
   const handleSelectProperty = (id) => {
     setSelectedProperties(prev => 
@@ -72,11 +78,11 @@ function Properties() {
 
   const handleDeleteSelected = () => {
     if (selectedProperties.length === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedProperties.length} properties?`)) {
-      setAssets(prev => prev.filter(asset => !selectedProperties.includes(asset.id)));
-      setSelectedProperties([]);
-      setToast({ message: `${selectedProperties.length} properties deleted successfully`, type: 'success' });
-    }
+    setDeleteConfirmation({
+      isOpen: true,
+      asset: null,
+      isBulk: true
+    });
   };
 
   // ESC key to deselect all (only if no modal is open)
@@ -155,10 +161,28 @@ function Properties() {
   };
 
   const handleDelete = (asset) => {
-    console.log('Delete asset:', asset);
-    setAssets(prev => prev.filter(a => a.id !== asset.id));
-    // Dispatch custom event for real-time updates
-    window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    setDeleteConfirmation({
+      isOpen: true,
+      asset: asset,
+      isBulk: false
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmation.isBulk) {
+      // Bulk delete
+      setAssets(prev => prev.filter(asset => !selectedProperties.includes(asset.id)));
+      setSelectedProperties([]);
+      setToast({ message: `${selectedProperties.length} properties deleted successfully`, type: 'success' });
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    } else {
+      // Individual delete
+      const asset = deleteConfirmation.asset;
+      console.log('Delete asset:', asset);
+      setAssets(prev => prev.filter(a => a.id !== asset.id));
+      setToast({ message: `Property ${asset.propertyNumber} deleted successfully`, type: 'success' });
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    }
   };
 
   const handleGenerateCOA = (asset) => {
@@ -616,7 +640,21 @@ function Properties() {
           </div>
         )}
       </div>
-      
+
+      <ConfirmationDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, asset: null, isBulk: false })}
+        onConfirm={confirmDelete}
+        title={deleteConfirmation.isBulk ? 'Delete Selected Properties' : 'Delete Property'}
+        message={
+          deleteConfirmation.isBulk
+            ? `Are you sure you want to delete ${selectedProperties.length} selected properties? This action cannot be undone.`
+            : `Are you sure you want to delete property ${deleteConfirmation.asset?.propertyNumber}? This action cannot be undone.`
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
       {toast && (
         <Toast
           message={toast.message}

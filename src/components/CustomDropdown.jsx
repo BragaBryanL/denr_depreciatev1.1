@@ -34,16 +34,16 @@ function CustomDropdown({ value, onChange, options, placeholder, label, searchab
   const selectedIcon = iconMap[value] || iconMap['all'];
 
   return (
-    <div className="relative z-[9999]" ref={dropdownRef}>
+    <div className="relative z-50" ref={dropdownRef}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           {label}
         </label>
       )}
-      
+
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-4 border border-green-300/50 dark:border-gray-600 rounded-lg cursor-pointer 
+        className="w-full px-4 py-4 border border-green-300/50 dark:border-gray-600 rounded-lg cursor-pointer
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                    focus:outline-none focus:ring-2 focus:ring-denr-green/50 focus:border-denr-green
                    transition-all duration-200
@@ -59,7 +59,7 @@ function CustomDropdown({ value, onChange, options, placeholder, label, searchab
       </div>
 
       {isOpen && (
-        <div className="absolute z-[99999] w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl max-h-96 overflow-hidden">
+        <div className="absolute z-[1000] w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl max-h-96 overflow-hidden">
           {searchable && (
             <div className="p-3 border-b border-gray-200 dark:border-gray-700">
               <div className="relative">
@@ -69,7 +69,7 @@ function CustomDropdown({ value, onChange, options, placeholder, label, searchab
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                  className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                            bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100
                            focus:outline-none focus:ring-2 focus:ring-denr-green/50"
                   onClick={(e) => e.stopPropagation()}
@@ -102,8 +102,8 @@ function CustomDropdown({ value, onChange, options, placeholder, label, searchab
                     key={index}
                     onClick={() => handleSelect(option)}
                     className={`px-4 py-4 cursor-pointer transition-colors duration-150 flex items-center gap-3
-                      ${value === option 
-                        ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium' 
+                      ${value === option
+                        ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium'
                         : 'text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }
                       ${index !== filteredOptions.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Download, Edit, Trash2, FileText } from 'lucide-react';
 import Modal from './Modal.jsx';
+import ConfirmationDialog from './ConfirmationDialog.jsx';
 
 function RepairMaintenance() {
   const tableRef = React.useRef(null);
@@ -20,6 +21,11 @@ function RepairMaintenance() {
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    transaction: null,
+    isBulk: false
+  });
   const [formData, setFormData] = useState({
     propertyNumber: '',
     natureOfRepair: '',
@@ -45,12 +51,11 @@ function RepairMaintenance() {
 
   const handleDeleteSelectedTransactions = () => {
     if (selectedTransactions.length === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedTransactions.length} transactions?`)) {
-      setTransactions(prev => prev.filter(transaction => !selectedTransactions.includes(transaction.id)));
-      setSelectedTransactions([]);
-      // Dispatch custom event for real-time updates
-      window.dispatchEvent(new CustomEvent('denrDataChanged'));
-    }
+    setDeleteConfirmation({
+      isOpen: true,
+      transaction: null,
+      isBulk: true
+    });
   };
 
   // ESC key to deselect all (only if no modal is open)
@@ -154,10 +159,26 @@ function RepairMaintenance() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
-    // Dispatch custom event for real-time updates
-    window.dispatchEvent(new CustomEvent('denrDataChanged'));
+  const handleDelete = (transaction) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      transaction: transaction,
+      isBulk: false
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmation.isBulk) {
+      // Bulk delete
+      setTransactions(prev => prev.filter(transaction => !selectedTransactions.includes(transaction.id)));
+      setSelectedTransactions([]);
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    } else {
+      // Individual delete
+      const transaction = deleteConfirmation.transaction;
+      setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    }
   };
 
   const exportToCSV = () => {
@@ -462,7 +483,7 @@ function RepairMaintenance() {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(transaction.id)}
+                        onClick={() => handleDelete(transaction)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete"
                       >
@@ -509,6 +530,20 @@ function RepairMaintenance() {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, transaction: null, isBulk: false })}
+        onConfirm={confirmDelete}
+        title={deleteConfirmation.isBulk ? 'Delete Selected Transactions' : 'Delete Transaction'}
+        message={
+          deleteConfirmation.isBulk
+            ? `Are you sure you want to delete ${selectedTransactions.length} selected transactions? This action cannot be undone.`
+            : `Are you sure you want to delete transaction ${deleteConfirmation.transaction?.propertyNumber}? This action cannot be undone.`
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
