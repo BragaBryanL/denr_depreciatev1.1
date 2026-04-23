@@ -1,18 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, X, Edit, Trash2, Search, Filter, Download, Calculator, FileText, Upload } from 'lucide-react';
+import { Plus, Save, X, Edit, Trash2, Search, Filter, Download, Calculator, FileText, Upload, Building, Landmark, Car, Laptop, Server, Phone, Wrench, Home, TreePine, Droplets, Zap, Briefcase, Shield, Package, CheckCircle2, XCircle, Filter as FilterIcon } from 'lucide-react';
 import AssetForm from './AssetForm.jsx';
 import Modal from './Modal.jsx';
 import Toast from './Toast.jsx';
+import CustomDropdown from './CustomDropdown.jsx';
 import * as XLSX from 'xlsx';
 
 function Properties() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [toast, setToast] = useState(null);
+  const tableRef = React.useRef(null);
   const [assets, setAssets] = useState(() => {
     const savedAssets = localStorage.getItem('denr_assets');
     return savedAssets ? JSON.parse(savedAssets) : [];
   });
+
+  // Icon mappings for PPE classes
+  const ppeClassIconMap = {
+    'all': <FilterIcon className="w-4 h-4" />,
+    'Land': <Landmark className="w-4 h-4" />,
+    'Land Improvements, Reforestation Projects': <TreePine className="w-4 h-4" />,
+    'Other Land Improvements': <Home className="w-4 h-4" />,
+    'Water Supply Systems': <Droplets className="w-4 h-4" />,
+    'Power Supply Systems': <Zap className="w-4 h-4" />,
+    'Buildings': <Building className="w-4 h-4" />,
+    'Other Structures': <Home className="w-4 h-4" />,
+    'Office Equipment': <Briefcase className="w-4 h-4" />,
+    'Information and Communication Technology Equipment': <Laptop className="w-4 h-4" />,
+    'Communication Equipment': <Phone className="w-4 h-4" />,
+    'Technical and Scientific Equipment': <Server className="w-4 h-4" />,
+    'Motor Vehicles': <Car className="w-4 h-4" />,
+    'Furniture and Fixtures': <Package className="w-4 h-4" />,
+    'Construction in Progress - Land Improvements': <Wrench className="w-4 h-4" />,
+    'Construction in Progress - Buildings and Other Structures': <Wrench className="w-4 h-4" />,
+    'Disaster Response and Rescue Equipment': <Shield className="w-4 h-4" />
+  };
+
+  // Icon mappings for status
+  const statusIconMap = {
+    'all': <FilterIcon className="w-4 h-4" />,
+    'Serviceable': <CheckCircle2 className="w-4 h-4" />,
+    'Unserviceable': <XCircle className="w-4 h-4" />
+  };
 
   // Save assets to localStorage whenever they change
   useEffect(() => {
@@ -22,6 +52,47 @@ function Properties() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedProperties, setSelectedProperties] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const handleSelectProperty = (id) => {
+    setSelectedProperties(prev => 
+      prev.includes(id) ? prev.filter(propId => propId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedProperties.length === paginatedAssets.length) {
+      setSelectedProperties([]);
+    } else {
+      setSelectedProperties(paginatedAssets.map(asset => asset.id));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedProperties.length === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedProperties.length} properties?`)) {
+      setAssets(prev => prev.filter(asset => !selectedProperties.includes(asset.id)));
+      setSelectedProperties([]);
+      setToast({ message: `${selectedProperties.length} properties deleted successfully`, type: 'success' });
+    }
+  };
+
+  // ESC key to deselect all (only if no modal is open)
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        const modal = document.querySelector('.fixed.inset-0.z-\\[999999\\]');
+        if (!modal) {
+          setSelectedProperties([]);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, []);
 
   const handleAddAsset = (newAsset) => {
     if (editingAsset) {
@@ -184,18 +255,36 @@ function Properties() {
               
               // Get date acquired and handle format conversion
               let dateAcquired = row['Date Acquired'] || row['DateAcquired'] || row['Date_Acquired'] || row['dateAcquired'] || row['Date'] || '';
-              if (dateAcquired && typeof dateAcquired === 'string') {
-                // Convert MM/DD/YYYY to YYYY/MM/DD if needed
-                const dateParts = dateAcquired.split('/');
-                if (dateParts.length === 3) {
-                  const [month, day, year] = dateParts;
-                  if (year.length === 4) {
-                    dateAcquired = `${year}/${month}/${day}`;
+              
+              if (dateAcquired) {
+                if (typeof dateAcquired === 'number') {
+                  // Handle Excel serial date numbers
+                  // Excel epoch starts at January 1, 1900 (serial number 1)
+                  const excelEpoch = new Date(1900, 0, 1);
+                  const date = new Date(excelEpoch.getTime() + (dateAcquired - 2) * 24 * 60 * 60 * 1000);
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  dateAcquired = `${year}/${month}/${day}`;
+                } else if (typeof dateAcquired === 'string') {
+                  // Convert MM/DD/YYYY to YYYY/MM/DD if needed
+                  const dateParts = dateAcquired.split('/');
+                  if (dateParts.length === 3) {
+                    const [month, day, year] = dateParts;
+                    if (year.length === 4) {
+                      dateAcquired = `${year}/${month}/${day}`;
+                    }
                   }
+                } else if (dateAcquired instanceof Date) {
+                  // If it's a date object, convert to string
+                  const year = dateAcquired.getFullYear();
+                  const month = String(dateAcquired.getMonth() + 1).padStart(2, '0');
+                  const day = String(dateAcquired.getDate()).padStart(2, '0');
+                  dateAcquired = `${year}/${month}/${day}`;
+                } else {
+                  // Convert to string as fallback
+                  dateAcquired = String(dateAcquired);
                 }
-              } else if (dateAcquired && typeof dateAcquired !== 'string') {
-                // If it's a date object, convert to string
-                dateAcquired = String(dateAcquired);
               }
               
               return {
@@ -252,6 +341,25 @@ function Properties() {
 
   const totalAssetsValue = filteredAssets.reduce((sum, asset) => sum + (parseFloat(asset.cost) || 0), 0);
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
+  const paginatedAssets = filteredAssets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCategory, filterStatus]);
+
+  // Scroll to table when page changes
+  useEffect(() => {
+    if (tableRef.current) {
+      tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage]);
+
   return (
     <div className="space-y-6">
       {/* Header and Add Button */}
@@ -302,7 +410,7 @@ function Properties() {
           </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Search */}
         <div className="flex flex-wrap gap-4 items-center">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -314,32 +422,10 @@ function Properties() {
               className="denr-input w-full pl-10"
             />
           </div>
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="denr-input">
-            <option value="all">All PPE Classes</option>
-            <option value="Land">Land</option>
-            <option value="Land Improvements, Reforestation Projects">Land Improvements, Reforestation Projects</option>
-            <option value="Other Land Improvements">Other Land Improvements</option>
-            <option value="Water Supply Systems">Water Supply Systems</option>
-            <option value="Power Supply Systems">Power Supply Systems</option>
-            <option value="Buildings">Buildings</option>
-            <option value="Other Structures">Other Structures</option>
-            <option value="Office Equipment">Office Equipment</option>
-            <option value="Information and Communication Technology Equipment">Information and Communication Technology Equipment</option>
-            <option value="Communication Equipment">Communication Equipment</option>
-            <option value="Technical and Scientific Equipment">Technical and Scientific Equipment</option>
-            <option value="Motor Vehicles">Motor Vehicles</option>
-            <option value="Furniture and Fixtures">Furniture and Fixtures</option>
-            <option value="Construction in Progress - Land Improvements">Construction in Progress - Land Improvements</option>
-            <option value="Construction in Progress - Buildings and Other Structures">Construction in Progress - Buildings and Other Structures</option>
-            <option value="Disaster Response and Rescue Equipment">Disaster Response and Rescue Equipment</option>
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="denr-input">
-            <option value="all">All Status</option>
-            <option value="Serviceable">Serviceable</option>
-            <option value="Unserviceable">Unserviceable</option>
-          </select>
         </div>
       </div>
+      
+      <div className="mb-8"></div>
 
       {/* Add Property Modal */}
       <Modal 
@@ -362,12 +448,53 @@ function Properties() {
       </Modal>
 
       {/* Properties Table */}
-      <div className="denr-card">
-        <h3 className="text-lg font-semibold text-denr-green mb-4">Property List</h3>
+      <div className="denr-card" ref={tableRef}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-denr-green">Property List</h3>
+          <div className="flex gap-2 items-center">
+            <CustomDropdown
+              value={filterCategory}
+              onChange={setFilterCategory}
+              options={['all', 'Land', 'Land Improvements, Reforestation Projects', 'Other Land Improvements', 'Water Supply Systems', 'Power Supply Systems', 'Buildings', 'Other Structures', 'Office Equipment', 'Information and Communication Technology Equipment', 'Communication Equipment', 'Technical and Scientific Equipment', 'Motor Vehicles', 'Furniture and Fixtures', 'Construction in Progress - Land Improvements', 'Construction in Progress - Buildings and Other Structures', 'Disaster Response and Rescue Equipment']}
+              placeholder="All PPE Classes"
+              searchable={false}
+              iconMap={ppeClassIconMap}
+            />
+            <CustomDropdown
+              value={filterStatus}
+              onChange={setFilterStatus}
+              options={['all', 'Serviceable', 'Unserviceable']}
+              placeholder="All Status"
+              iconMap={statusIconMap}
+            />
+            {selectedProperties.length > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="px-4 py-4 border border-red-300/50 dark:border-gray-600 rounded-lg cursor-pointer 
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500
+                         transition-all duration-200
+                         font-medium
+                         hover:border-red-500 dark:hover:border-red-400
+                         shadow-sm hover:shadow-md min-h-[56px]"
+              >
+                Delete Selected ({selectedProperties.length})
+              </button>
+            )}
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-xs">
             <thead className="bg-denr-bg">
               <tr>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedProperties.length === paginatedAssets.length && paginatedAssets.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-denr-green focus:ring-denr-green"
+                  />
+                </th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Property Number</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Office/Place</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Property Description</th>
@@ -388,8 +515,16 @@ function Properties() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAssets.map((asset) => (
+              {paginatedAssets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-gray-50">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={selectedProperties.includes(asset.id)}
+                      onChange={() => handleSelectProperty(asset.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-denr-green focus:ring-denr-green"
+                    />
+                  </td>
                   <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{asset.propertyNumber}</td>
                   <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{asset.officePlace}</td>
                   <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">{asset.propertyDescription}</td>
@@ -447,6 +582,39 @@ function Properties() {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-4 px-2">
+            <div className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAssets.length)} of {filteredAssets.length} properties
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       
       {toast && (

@@ -46,7 +46,7 @@ function Sidebar({ activeView, setActiveView }) {
       <div className="mt-8 pt-8 border-t border-denr-green border-opacity-30">
         <div className="text-denr-light text-sm">
           <p className="mb-2">© 2024 PENRO-DENR</p>
-          <p>Asset Depreciation System</p>
+          <p>Property Depreciation System</p>
         </div>
       </div>
     </aside>

@@ -1,9 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 
 function Reports() {
   const [reportType, setReportType] = useState('depreciation');
   const [dateRange, setDateRange] = useState('current-year');
+  const [assets, setAssets] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const reportsRef = React.useRef(null);
+  const tableRef = React.useRef(null);
+
+  const loadData = () => {
+    const savedAssets = localStorage.getItem('denr_assets');
+    if (savedAssets) {
+      setAssets(JSON.parse(savedAssets));
+    }
+
+    const savedTransactions = localStorage.getItem('denr_transactions');
+    if (savedTransactions) {
+      setTransactions(JSON.parse(savedTransactions));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+
+    // Listen for localStorage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'denr_assets' || e.key === 'denr_transactions') {
+        loadData();
+      }
+    };
+
+    // Listen for custom data change event
+    const handleDataChange = () => {
+      loadData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('denrDataChanged', handleDataChange);
+
+    // Intersection Observer to reload when Reports becomes visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadData();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (reportsRef.current) {
+      observer.observe(reportsRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('denrDataChanged', handleDataChange);
+      if (reportsRef.current) {
+        observer.unobserve(reportsRef.current);
+      }
+    };
+  }, []);
 
   const reportTypes = [
     { id: 'depreciation', label: 'Depreciation Report', icon: FileText },
@@ -18,6 +79,25 @@ function Reports() {
     { id: 'last-year', label: 'Last Year' },
     { id: 'custom', label: 'Custom Range' },
   ];
+
+  // Pagination logic
+  const totalPages = Math.ceil(assets.length / itemsPerPage);
+  const paginatedAssets = assets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when report type changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [reportType]);
+
+  // Scroll to table when page changes
+  useEffect(() => {
+    if (tableRef.current) {
+      tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage]);
 
   const generateReport = () => {
     console.log(`Generating ${reportType} report for ${dateRange}`);
@@ -66,19 +146,61 @@ function Reports() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-98-03-0001-01</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Buildings</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">PENRO</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2020/09/14</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">30 years</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱41,166.67</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱978,688.49</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱321,311.51</td>
-                  </tr>
+                  {paginatedAssets.map((asset) => (
+                    <tr key={asset.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.propertyNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.ppeClass}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.officePlace}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.dateAcquired}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asset.usefulLife}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱{parseFloat(asset.annualDepreciation || 0).toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱{parseFloat(asset.accumulatedDepreciation || 0).toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱{parseFloat(asset.netBookValue || 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {assets.length === 0 && (
+                    <tr>
+                      <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                        No assets found. Add properties to generate reports.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-between items-center mt-4 px-2">
+                <div className="text-sm text-gray-600">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, assets.length)} of {assets.length} assets
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       case 'asset-summary':
@@ -89,34 +211,39 @@ function Reports() {
               <div className="denr-card">
                 <h5 className="text-md font-semibold mb-3">Total Assets by Category</h5>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Land:</span>
-                    <span className="font-semibold">₱2,500,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Buildings:</span>
-                    <span className="font-semibold">₱1,800,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Equipment:</span>
-                    <span className="font-semibold">₱1,200,000</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Vehicles:</span>
-                    <span className="font-semibold">₱800,000</span>
-                  </div>
+                  {assets.reduce((acc, asset) => {
+                    const existing = acc.find(item => item.name === asset.ppeClass);
+                    if (existing) {
+                      existing.value += asset.cost || 0;
+                    } else {
+                      acc.push({ name: asset.ppeClass, value: asset.cost || 0 });
+                    }
+                    return acc;
+                  }, []).map((category) => (
+                    <div key={category.name} className="flex justify-between">
+                      <span>{category.name}:</span>
+                      <span className="font-semibold">₱{category.value.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {assets.length === 0 && (
+                    <div className="text-sm text-gray-500">No assets found</div>
+                  )}
                 </div>
               </div>
               <div className="denr-card">
                 <h5 className="text-md font-semibold mb-3">Depreciation Summary</h5>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span>Total Depreciation (YTD):</span>
-                    <span className="font-semibold text-red-600">₱1,418,688</span>
+                    <span>Total Cost:</span>
+                    <span className="font-semibold">₱{assets.reduce((sum, asset) => sum + (asset.cost || 0), 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Depreciation:</span>
+                    <span className="font-semibold text-red-600">₱{assets.reduce((sum, asset) => sum + (asset.accumulatedDepreciation || 0), 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Net Book Value:</span>
-                    <span className="font-semibold text-denr-green">₱5,581,312</span>
+                    <span className="font-semibold text-denr-green">₱{assets.reduce((sum, asset) => sum + (asset.netBookValue || 0), 0).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -133,7 +260,7 @@ function Reports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={reportsRef} className="space-y-6">
       <div className="denr-card">
         <h3 className="text-lg font-semibold text-denr-green mb-4">Report Generator</h3>
         
@@ -195,7 +322,7 @@ function Reports() {
         </div>
       </div>
 
-      <div className="denr-card">
+      <div className="denr-card" ref={tableRef}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-denr-green">Report Preview</h3>
           <div className="flex items-center space-x-2 text-sm text-gray-600">

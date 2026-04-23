@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, X, Calculator, FileText } from 'lucide-react';
+import { Save, X, Calculator, FileText, Building, Landmark, Car, Laptop, Server, Phone, Wrench, Home, TreePine, Droplets, Zap, Briefcase, Shield, Package, CheckCircle2, XCircle } from 'lucide-react';
+import CustomDropdown from './CustomDropdown.jsx';
 
 const offices = [
   'PENRO',
@@ -40,7 +41,7 @@ const fundClusters = [
   'Trust Receipts',
 ];
 
-function AssetForm({ isVisible, onClose, onAddAsset }) {
+function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
   const [formData, setFormData] = useState({
     propertyNumber: '',
     dateAcquired: '',
@@ -57,6 +58,35 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
     remarks: '',
   });
 
+  // Populate form when editing
+  useEffect(() => {
+    if (editingAsset) {
+      // Convert date format from YYYY/MM/DD to YYYY-MM-DD for HTML date input
+      let formattedDate = editingAsset.dateAcquired || '';
+      if (formattedDate && typeof formattedDate === 'string') {
+        formattedDate = formattedDate.replace(/\//g, '-');
+      }
+      
+      setFormData({
+        propertyNumber: editingAsset.propertyNumber || '',
+        dateAcquired: formattedDate,
+        officeDescription: editingAsset.propertyDescription || '',
+        accountableOfficer: editingAsset.accountableOfficer || '',
+        ppeClass: editingAsset.ppeClass || '',
+        accountCode: editingAsset.accountCode || '',
+        usefulLife: editingAsset.usefulLife || '',
+        office: editingAsset.officePlace || '',
+        fundCluster: '',
+        status: editingAsset.status || 'Serviceable',
+        unitCost: editingAsset.cost ? (editingAsset.cost / (editingAsset.quantity || 1)).toString() : '',
+        quantity: editingAsset.quantity || '1',
+        remarks: editingAsset.remarks || '',
+      });
+    } else {
+      handleReset();
+    }
+  }, [editingAsset]);
+
   const [calculatedValues, setCalculatedValues] = useState({
     totalCost: '',
     residual: '',
@@ -67,9 +97,60 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
     netbookValue: '',
   });
 
+  // Icon mappings for PPE classes
+  const ppeClassIconMap = {
+    'Land': <Landmark className="w-4 h-4" />,
+    'Land Improvements, Reforestation Projects': <TreePine className="w-4 h-4" />,
+    'Other Land Improvements': <Home className="w-4 h-4" />,
+    'Water Supply Systems': <Droplets className="w-4 h-4" />,
+    'Power Supply Systems': <Zap className="w-4 h-4" />,
+    'Buildings': <Building className="w-4 h-4" />,
+    'Other Structures': <Home className="w-4 h-4" />,
+    'Office Equipment': <Briefcase className="w-4 h-4" />,
+    'Information and Communication Technology Equipment': <Laptop className="w-4 h-4" />,
+    'Communication Equipment': <Phone className="w-4 h-4" />,
+    'Technical and Scientific Equipment': <Server className="w-4 h-4" />,
+    'Motor Vehicles': <Car className="w-4 h-4" />,
+    'Furniture and Fixtures': <Package className="w-4 h-4" />,
+    'Construction in Progress - Land Improvements': <Wrench className="w-4 h-4" />,
+    'Construction in Progress - Buildings and Other Structures': <Wrench className="w-4 h-4" />,
+    'Disaster Response and Rescue Equipment': <Shield className="w-4 h-4" />
+  };
+
+  // Icon mappings for status
+  const statusIconMap = {
+    'Serviceable': <CheckCircle2 className="w-4 h-4" />,
+    'Unserviceable': <XCircle className="w-4 h-4" />
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Auto-format property number with dashes
+    if (name === 'propertyNumber') {
+      let formattedValue = value.replace(/[^a-zA-Z0-9]/g, ''); // Remove all non-alphanumeric chars
+      
+      // Auto-insert dashes at positions 4, 7, 10, 15 (format: XXXX-XX-XX-XXXX-XXX = 18 chars total)
+      if (formattedValue.length > 4) {
+        formattedValue = formattedValue.slice(0, 4) + '-' + formattedValue.slice(4);
+      }
+      if (formattedValue.length > 7) {
+        formattedValue = formattedValue.slice(0, 7) + '-' + formattedValue.slice(7);
+      }
+      if (formattedValue.length > 10) {
+        formattedValue = formattedValue.slice(0, 10) + '-' + formattedValue.slice(10);
+      }
+      if (formattedValue.length > 15) {
+        formattedValue = formattedValue.slice(0, 15) + '-' + formattedValue.slice(15);
+      }
+      
+      // Limit to max length (18 chars: XXXX-XX-XX-XXXX-XXX)
+      formattedValue = formattedValue.slice(0, 18);
+      
+      setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
 
     // Auto-fill based on PPE Class selection
     if (name === 'ppeClass') {
@@ -78,7 +159,7 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
         setFormData(prev => ({
           ...prev,
           accountCode: selectedClass.accountCode,
-          usefulLife: selectedClass.usefulLife.toString()
+          usefulLife: selectedClass.usefulLife
         }));
       }
     }
@@ -206,10 +287,12 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
               name="propertyNumber"
               value={formData.propertyNumber}
               onChange={handleInputChange}
+              placeholder="0000-00-00-0000-000"
               className="denr-input w-full"
-              maxLength="20"
+              maxLength="18"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Dashes auto-inserted. Letters and numbers allowed. (18 chars total)</p>
           </div>
 
           <div>
@@ -251,19 +334,16 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">PPE Class</label>
-            <select
-              name="ppeClass"
+            <CustomDropdown
               value={formData.ppeClass}
-              onChange={handleInputChange}
-              className="denr-input w-full"
+              onChange={(value) => handleInputChange({ target: { name: 'ppeClass', value } })}
+              options={ppeClasses.map(ppe => ppe.name)}
+              placeholder="Select PPE Class"
+              label="PPE Class"
+              searchable={true}
+              iconMap={ppeClassIconMap}
               required
-            >
-              <option value="">Select PPE Class</option>
-              {ppeClasses.map((ppeClass, index) => (
-                <option key={index} value={ppeClass.name}>{ppeClass.name}</option>
-              ))}
-            </select>
+            />
           </div>
 
           <div>
@@ -291,46 +371,34 @@ function AssetForm({ isVisible, onClose, onAddAsset }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Office</label>
-            <select
-              name="office"
+            <CustomDropdown
               value={formData.office}
-              onChange={handleInputChange}
-              className="denr-input w-full"
-            >
-              <option value="">Select Office</option>
-              {offices.map((office, index) => (
-                <option key={index} value={office}>{office}</option>
-              ))}
-            </select>
+              onChange={(value) => handleInputChange({ target: { name: 'office', value } })}
+              options={offices}
+              placeholder="Select Office"
+              label="Office"
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fund Cluster</label>
-            <select
-              name="fundCluster"
+            <CustomDropdown
               value={formData.fundCluster}
-              onChange={handleInputChange}
-              className="denr-input w-full"
-            >
-              <option value="">Select Fund Cluster</option>
-              {fundClusters.map((fund, index) => (
-                <option key={index} value={fund}>{fund}</option>
-              ))}
-            </select>
+              onChange={(value) => handleInputChange({ target: { name: 'fundCluster', value } })}
+              options={fundClusters}
+              placeholder="Select Fund Cluster"
+              label="Fund Cluster"
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              name="status"
+            <CustomDropdown
               value={formData.status}
-              onChange={handleInputChange}
-              className="denr-input w-full"
-            >
-              <option value="Serviceable">Serviceable</option>
-              <option value="Unserviceable">Unserviceable</option>
-            </select>
+              onChange={(value) => handleInputChange({ target: { name: 'status', value } })}
+              options={['Serviceable', 'Unserviceable']}
+              placeholder="Select Status"
+              label="Status"
+              iconMap={statusIconMap}
+            />
           </div>
 
           <div>

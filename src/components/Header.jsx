@@ -11,7 +11,7 @@ function Header() {
               <img 
                 src="./denrlogo.jpg" 
                 alt="PENRO-DENR Logo" 
-                className="h-12 w-auto max-h-12 object-contain"
+                className="h-12 w-auto max-h-12 logo-circular"
               />
               <div className="ml-4">
                 <h1 className="text-2xl font-bold tracking-tight">PENRO-DENR</h1>

@@ -58,12 +58,18 @@ function Login({ onLogin }) {
     if (loginType === 'admin') {
       validCredentials = adminCredentials;
     } else {
-      validCredentials = [...storedUsers];
+      // Only allow active users (not pending)
+      validCredentials = storedUsers.filter(user => user.status !== 'pending');
     }
 
     setTimeout(() => {
       const isValid = validCredentials.some(
         cred => cred.username === formData.username && cred.password === formData.password
+      );
+
+      // Check if user exists but is pending
+      const pendingUser = storedUsers.some(
+        user => user.username === formData.username && user.password === formData.password && user.status === 'pending'
       );
 
       if (isValid) {
@@ -72,6 +78,9 @@ function Login({ onLogin }) {
         localStorage.setItem('username', formData.username);
         localStorage.setItem('userType', loginType);
         onLogin(formData.username);
+      } else if (pendingUser) {
+        setError('Your account is pending admin approval');
+        setIsLoading(false);
       } else {
         setError(`Invalid ${loginType} credentials`);
         setIsLoading(false);
@@ -106,15 +115,26 @@ function Login({ onLogin }) {
     const updatedUsers = [...existingUsers, {
       username: newUser.username,
       password: newUser.password,
-      role: newUser.role,
+      role: 'user',
+      status: 'pending',
       createdAt: new Date().toISOString()
     }];
 
     // Store users in localStorage
     localStorage.setItem('users', JSON.stringify(updatedUsers));
 
+    // Notify admin about new user registration with accept/reject buttons
+    if (window.addNotification) {
+      window.addNotification({
+        type: 'pending_account',
+        message: `New user account pending: ${newUser.username}`,
+        username: newUser.username,
+        userId: Date.now().toString()
+      });
+    }
+
     setTimeout(() => {
-      setCreateSuccess(`Account created successfully! Username: ${newUser.username}, Password: ${newUser.password}`);
+      setCreateSuccess(`Account submitted for approval! Username: ${newUser.username}, Password: ${newUser.password}. Please wait for admin approval.`);
       setNewUser({ username: '', password: '', confirmPassword: '', role: 'user' });
       setIsCreatingAccount(false);
     }, 1000);
@@ -171,7 +191,7 @@ function Login({ onLogin }) {
               <img 
                 src="/denrlogo.jpg" 
                 alt="DENR Logo" 
-                className="w-16 h-16 object-cover rounded-full"
+                className="w-16 h-16 logo-circular"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.style.display = 'none';
@@ -295,12 +315,12 @@ function Login({ onLogin }) {
             </button>
           </form>
 
-          {/* Create Account Button - Only for Admin */}
-          {loginType === 'admin' && (
+          {/* Create Account Button - Only for User Registration */}
+          {loginType === 'user' && (
             <div className="mt-4">
               <button
                 onClick={() => setShowCreateAccount(!showCreateAccount)}
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-semibold flex items-center justify-center"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 font-semibold flex items-center justify-center"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Account
@@ -310,10 +330,10 @@ function Login({ onLogin }) {
 
           {/* Create Account Form */}
           {showCreateAccount && (
-            <div className="mt-6 p-6 bg-gradient-to-br from-white to-green-50/50 rounded-xl border border-denr-green/30 shadow-lg">
+            <div className="mt-6 p-6 bg-gradient-to-br from-white to-blue-50/50 rounded-xl border border-blue-500/30 shadow-lg">
               <div className="flex items-center mb-4">
-                <Users className="w-5 h-5 text-denr-green mr-2" />
-                <h3 className="text-lg font-bold text-denr-green">Create New User Account</h3>
+                <Users className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="text-lg font-bold text-blue-600">Create New Account</h3>
               </div>
               
               <form onSubmit={handleCreateAccount} className="space-y-4">
@@ -328,7 +348,7 @@ function Login({ onLogin }) {
                     value={newUser.username}
                     onChange={handleNewUserChange}
                     required
-                    className="w-full px-3 py-2 border border-denr-green/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green/50 focus:border-denr-green bg-white/95 backdrop-blur-sm transition-all duration-200"
+                    className="w-full px-3 py-2 border border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 bg-white/95 backdrop-blur-sm transition-all duration-200"
                     placeholder="Enter username"
                   />
                 </div>
@@ -344,7 +364,7 @@ function Login({ onLogin }) {
                     value={newUser.password}
                     onChange={handleNewUserChange}
                     required
-                    className="w-full px-3 py-2 border border-denr-green/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green/50 focus:border-denr-green bg-white/95 backdrop-blur-sm transition-all duration-200"
+                    className="w-full px-3 py-2 border border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 bg-white/95 backdrop-blur-sm transition-all duration-200"
                     placeholder="Enter password"
                   />
                 </div>
@@ -360,7 +380,7 @@ function Login({ onLogin }) {
                     value={newUser.confirmPassword}
                     onChange={handleNewUserChange}
                     required
-                    className="w-full px-3 py-2 border border-denr-green/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green/50 focus:border-denr-green bg-white/95 backdrop-blur-sm transition-all duration-200"
+                    className="w-full px-3 py-2 border border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 bg-white/95 backdrop-blur-sm transition-all duration-200"
                     placeholder="Confirm password"
                   />
                 </div>
@@ -384,7 +404,7 @@ function Login({ onLogin }) {
                 <button
                   type="submit"
                   disabled={isCreatingAccount}
-                  className="w-full bg-gradient-to-r from-denr-green to-green-700 text-white py-2 px-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-semibold"
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 px-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-semibold"
                 >
                   {isCreatingAccount ? (
                     <div className="flex items-center justify-center">

@@ -1,67 +1,116 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Package, DollarSign, AlertCircle } from 'lucide-react';
 
 function Dashboard() {
-  // Sample data for charts
-  const assetData = [
-    { name: 'Land', value: 2500000, count: 45 },
-    { name: 'Buildings', value: 1800000, count: 23 },
-    { name: 'Equipment', value: 1200000, count: 67 },
-    { name: 'Vehicles', value: 800000, count: 31 },
-    { name: 'Furniture', value: 450000, count: 89 },
-  ];
+  const [assets, setAssets] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const dashboardRef = React.useRef(null);
 
-  const depreciationData = [
-    { month: 'Jan', depreciation: 45000 },
-    { month: 'Feb', depreciation: 48000 },
-    { month: 'Mar', depreciation: 52000 },
-    { month: 'Apr', depreciation: 49000 },
-    { month: 'May', depreciation: 51000 },
-    { month: 'Jun', depreciation: 53000 },
-  ];
+  const loadData = () => {
+    const savedAssets = localStorage.getItem('denr_assets');
+    if (savedAssets) {
+      setAssets(JSON.parse(savedAssets));
+    }
+
+    const savedTransactions = localStorage.getItem('denr_transactions');
+    if (savedTransactions) {
+      setTransactions(JSON.parse(savedTransactions));
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+
+    // Listen for localStorage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'denr_assets' || e.key === 'denr_transactions') {
+        loadData();
+      }
+    };
+
+    // Listen for custom data change event
+    const handleDataChange = () => {
+      loadData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('denrDataChanged', handleDataChange);
+
+    // Intersection Observer to reload when Dashboard becomes visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadData();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (dashboardRef.current) {
+      observer.observe(dashboardRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('denrDataChanged', handleDataChange);
+      if (dashboardRef.current) {
+        observer.unobserve(dashboardRef.current);
+      }
+    };
+  }, []);
+
+  // Calculate asset data dynamically
+  const assetData = assets.reduce((acc, asset) => {
+    const existing = acc.find(item => item.name === asset.ppeClass);
+    if (existing) {
+      existing.value += asset.cost || 0;
+      existing.count += 1;
+    } else {
+      acc.push({ name: asset.ppeClass, value: asset.cost || 0, count: 1 });
+    }
+    return acc;
+  }, []);
+
+  // Calculate depreciation data dynamically
+  const depreciationData = assets.reduce((acc, asset) => {
+    if (asset.annualDepreciation) {
+      const month = new Date(asset.dateAcquired).toLocaleString('default', { month: 'short' });
+      const existing = acc.find(item => item.month === month);
+      if (existing) {
+        existing.depreciation += parseFloat(asset.annualDepreciation);
+      } else {
+        acc.push({ month, depreciation: parseFloat(asset.annualDepreciation) });
+      }
+    }
+    return acc;
+  }, []);
 
   const COLORS = ['#2E7D32', '#14532D', '#DCFEAA', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-  const totalAssets = assetData.reduce((sum, item) => sum + item.value, 0);
-  const totalDepreciation = depreciationData.reduce((sum, item) => sum + item.depreciation, 0);
-  const assetCount = assetData.reduce((sum, item) => sum + item.count, 0);
+  const totalAssets = assets.reduce((sum, asset) => sum + (asset.cost || 0), 0);
+  const totalDepreciation = assets.reduce((sum, asset) => sum + (asset.accumulatedDepreciation || 0), 0);
+  const assetCount = assets.length;
 
-  const recentAssets = [
-    {
-      propertyNumber: '2024-98-03-0001-01',
-      ppeClass: 'Buildings',
-      office: 'PENRO',
-      status: 'Serviceable',
-      totalCost: 1300000,
-      accumulatedDepreciation: 978688.49,
-      netbookValue: 321311.51,
-      dateAcquired: '2020/09/14'
-    },
-    {
-      propertyNumber: 'CI-SPHV-2025-08-03',
-      ppeClass: 'Machinery and Equipment',
-      office: 'INITAO',
-      status: 'Serviceable',
-      totalCost: 850000,
-      accumulatedDepreciation: 245000,
-      netbookValue: 605000,
-      dateAcquired: '2021/03/15'
-    },
-    {
-      propertyNumber: '2023-05-0002-02',
-      ppeClass: 'Motor Vehicles',
-      office: 'GINGOOG',
-      status: 'Unserviceable',
-      totalCost: 650000,
-      accumulatedDepreciation: 195000,
-      netbookValue: 455000,
-      dateAcquired: '2023/01/20'
-    }
-  ];
+  // Get recent assets (last 5)
+  const recentAssets = assets
+    .sort((a, b) => new Date(b.dateAcquired) - new Date(a.dateAcquired))
+    .slice(0, 5)
+    .map(asset => ({
+      propertyNumber: asset.propertyNumber,
+      ppeClass: asset.ppeClass,
+      office: asset.officePlace,
+      status: asset.status,
+      totalCost: asset.cost || 0,
+      accumulatedDepreciation: asset.accumulatedDepreciation || 0,
+      netbookValue: asset.netBookValue || 0,
+      dateAcquired: asset.dateAcquired
+    }));
 
   return (
-    <div className="space-y-6">
+    <div ref={dashboardRef} className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="denr-card">
@@ -111,7 +160,7 @@ function Dashboard() {
             <div>
               <p className="text-sm text-gray-600">Serviceable Assets</p>
               <p className="text-2xl font-bold text-denr-green">
-                {assetData.filter(item => item.name !== 'Vehicles').reduce((sum, item) => sum + item.count, 0)}
+                {assets.filter(asset => asset.status === 'Serviceable').length}
               </p>
             </div>
             <div className="p-3 bg-denr-light rounded-full">
@@ -125,14 +174,12 @@ function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="denr-card">
           <h3 className="text-lg font-semibold text-denr-green mb-4">Asset Distribution</h3>
-          <PieChart width={400} height={300}>
+          <PieChart width={500} height={400}>
             <Pie
               data={assetData}
               cx="50%"
               cy="50%"
-              labelLine={false}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              outerRadius={80}
+              outerRadius={120}
               fill="#8884d8"
               dataKey="value"
             >
@@ -146,7 +193,7 @@ function Dashboard() {
 
         <div className="denr-card">
           <h3 className="text-lg font-semibold text-denr-green mb-4">Monthly Depreciation Trend</h3>
-          <BarChart width={400} height={300} data={depreciationData}>
+          <BarChart width={500} height={400} data={depreciationData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />

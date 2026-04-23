@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileText } from 'lucide-react';
 
 function Modal({ isOpen, onClose, title, children }) {
@@ -6,13 +7,14 @@ function Modal({ isOpen, onClose, title, children }) {
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
         onClose();
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleEscape, true);
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleEscape, true);
     };
   }, [isOpen, onClose]);
 
@@ -27,13 +29,13 @@ function Modal({ isOpen, onClose, title, children }) {
     return null;
   }
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[999999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={handleBackdropClick}
     >
       <div 
-        className="bg-gradient-to-br from-white to-green-50 border-l-4 border-denr-green rounded-lg shadow-2xl w-fit max-w-6xl max-h-[90vh] overflow-y-auto"
+        className="bg-gradient-to-br from-white to-green-50 border-l-4 border-denr-green rounded-lg shadow-2xl w-fit max-w-6xl max-h-[90vh] overflow-y-auto my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -59,6 +61,8 @@ function Modal({ isOpen, onClose, title, children }) {
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
 
 export default Modal;
