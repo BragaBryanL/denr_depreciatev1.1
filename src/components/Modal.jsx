@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, FileText } from 'lucide-react';
 
 function Modal({ isOpen, onClose, title, children }) {
+  const scrollPositionRef = React.useRef(0);
+
   // Handle ESC key press
   useEffect(() => {
     const handleEscape = (e) => {
@@ -17,6 +19,27 @@ function Modal({ isOpen, onClose, title, children }) {
       document.removeEventListener('keydown', handleEscape, true);
     };
   }, [isOpen, onClose]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      // Save scroll position
+      scrollPositionRef.current = window.scrollY;
+      // Lock scroll on html element (not body to avoid position issues)
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      // Unlock scroll
+      document.documentElement.style.overflow = '';
+      // Restore scroll position with delay to ensure DOM is ready
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPositionRef.current);
+      });
+    }
+
+    return () => {
+      document.documentElement.style.overflow = '';
+    };
+  }, [isOpen]);
 
   // Handle click outside modal
   const handleBackdropClick = (e) => {
