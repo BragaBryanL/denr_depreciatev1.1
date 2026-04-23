@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, X, Edit, Trash2, Search, Filter, Download, Calculator, FileText, Upload, Building, Landmark, Car, Laptop, Server, Phone, Wrench, Home, TreePine, Droplets, Zap, Briefcase, Shield, Package, CheckCircle2, XCircle, Filter as FilterIcon } from 'lucide-react';
+import { Plus, Save, X, Edit, Trash2, Search, Filter, Download, Calculator, FileText, Upload, Building, Landmark, Car, Laptop, Server, Phone, Wrench, Home, TreePine, Droplets, Zap, Briefcase, Shield, Package, CheckCircle2, XCircle, Filter as FilterIcon, Copy } from 'lucide-react';
 import AssetForm from './AssetForm.jsx';
 import Modal from './Modal.jsx';
 import Toast from './Toast.jsx';
@@ -53,6 +53,7 @@ function Properties() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -355,13 +356,51 @@ function Properties() {
     input.click();
   };
 
-  const filteredAssets = assets.filter(asset => {
-    const matchesSearch = asset.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         asset.ppeClass.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || asset.ppeClass === filterCategory;
-    const matchesStatus = filterStatus === 'all' || asset.status === filterStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  // Pre-calculate duplicates to preserve order
+  const duplicatePropertyNumbers = React.useMemo(() => {
+    const counts = assets.reduce((acc, asset) => {
+      acc[asset.propertyNumber] = (acc[asset.propertyNumber] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.keys(counts).filter(number => counts[number] > 1);
+  }, [assets]);
+
+  const filteredAssets = React.useMemo(() => {
+    let result = assets.filter(asset => {
+      const matchesSearch = asset.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           asset.ppeClass.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (asset.officePlace && asset.officePlace.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCategory = filterCategory === 'all' || asset.ppeClass === filterCategory;
+      const matchesStatus = filterStatus === 'all' || asset.status === filterStatus;
+      
+      // Find duplicates if showDuplicatesOnly is true
+      if (showDuplicatesOnly) {
+        const isDuplicate = duplicatePropertyNumbers.includes(asset.propertyNumber);
+        return matchesSearch && matchesCategory && matchesStatus && isDuplicate;
+      }
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+
+    // Group duplicates together when showDuplicatesOnly is true
+    if (showDuplicatesOnly) {
+      const grouped = {};
+      const order = [];
+      
+      result.forEach(asset => {
+        if (!grouped[asset.propertyNumber]) {
+          grouped[asset.propertyNumber] = [];
+          order.push(asset.propertyNumber);
+        }
+        grouped[asset.propertyNumber].push(asset);
+      });
+      
+      // Flatten grouped array while preserving order of first occurrences
+      result = order.flatMap(propertyNumber => grouped[propertyNumber]);
+    }
+
+    return result;
+  }, [assets, searchTerm, filterCategory, filterStatus, showDuplicatesOnly, duplicatePropertyNumbers]);
 
   const totalAssetsValue = filteredAssets.reduce((sum, asset) => sum + (parseFloat(asset.cost) || 0), 0);
 
@@ -476,14 +515,19 @@ function Properties() {
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-denr-green">Property List</h3>
           <div className="flex gap-2 items-center">
-            <CustomDropdown
-              value={filterCategory}
-              onChange={setFilterCategory}
-              options={['all', 'Land', 'Land Improvements, Reforestation Projects', 'Other Land Improvements', 'Water Supply Systems', 'Power Supply Systems', 'Buildings', 'Other Structures', 'Office Equipment', 'Information and Communication Technology Equipment', 'Communication Equipment', 'Technical and Scientific Equipment', 'Motor Vehicles', 'Furniture and Fixtures', 'Construction in Progress - Land Improvements', 'Construction in Progress - Buildings and Other Structures', 'Disaster Response and Rescue Equipment']}
-              placeholder="All PPE Classes"
-              searchable={false}
-              iconMap={ppeClassIconMap}
-            />
+            <button
+              onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
+              className={`px-4 py-4 border rounded-lg cursor-pointer 
+                       transition-all duration-200
+                       shadow-sm hover:shadow-md min-h-[56px] flex items-center justify-center
+                       ${showDuplicatesOnly 
+                         ? 'bg-denr-green text-white border-denr-green hover:bg-green-700' 
+                         : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-green-300/50 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400'
+                       }`}
+              title={showDuplicatesOnly ? 'Show All Properties' : 'Show Duplicates Only'}
+            >
+              <Copy className="w-5 h-5" />
+            </button>
             <CustomDropdown
               value={filterStatus}
               onChange={setFilterStatus}
