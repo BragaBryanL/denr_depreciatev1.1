@@ -510,15 +510,49 @@ function RepairMaintenance() {
               >
                 Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
-                >
-                  {page}
-                </button>
-              ))}
+              {(() => {
+                const maxVisiblePages = 4;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+                
+                const pages = [];
+                if (startPage > 1) {
+                  pages.push(1);
+                  if (startPage > 2) {
+                    pages.push('...');
+                  }
+                }
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(i);
+                }
+                
+                if (endPage < totalPages) {
+                  if (endPage < totalPages - 1) {
+                    pages.push('...');
+                  }
+                  pages.push(totalPages);
+                }
+                
+                return pages.map((page, index) => {
+                  if (page === '...') {
+                    return <span key={`ellipsis-${index}`} className="px-3 py-2">...</span>;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {page}
+                    </button>
+                  );
+                });
+              })()}
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}

@@ -238,8 +238,8 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
     const assetData = {
       ...formData,
       ...calculatedValues,
-      unitCost: parseFloat(formData.unitCost),
-      quantity: parseInt(formData.quantity),
+      unitCost: parseFloat(formData.unitCost) || 0,
+      quantity: parseInt(formData.quantity) || 0,
     };
 
     onAddAsset(assetData);
@@ -277,7 +277,7 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Property Number</label>
@@ -289,7 +289,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               placeholder="0000-00-00-0000-000"
               className="denr-input w-full"
               maxLength="18"
-              required
             />
             <p className="text-xs text-gray-500 mt-1">Dashes auto-inserted. Letters and numbers allowed. (18 chars total)</p>
           </div>
@@ -302,7 +301,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               value={formData.dateAcquired}
               onChange={handleInputChange}
               className="denr-input w-full"
-              required
             />
           </div>
 
@@ -315,7 +313,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               onChange={handleInputChange}
               className="denr-input w-full"
               placeholder="Enter property description"
-              required
             />
           </div>
 
@@ -328,7 +325,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               onChange={handleInputChange}
               className="denr-input w-full"
               placeholder="Enter name of accountable officer"
-              required
             />
           </div>
 
@@ -425,7 +421,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               className="denr-input w-full"
               step="0.01"
               min="0"
-              required
             />
           </div>
 
@@ -438,7 +433,6 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
               onChange={handleInputChange}
               className="denr-input w-full"
               min="1"
-              required
             />
           </div>
 

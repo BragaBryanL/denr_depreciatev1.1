@@ -5,12 +5,15 @@ import Modal from './Modal.jsx';
 import Toast from './Toast.jsx';
 import CustomDropdown from './CustomDropdown.jsx';
 import ConfirmationDialog from './ConfirmationDialog.jsx';
+import COAPreviewModal from './COAPreviewModal.jsx';
+import { generateCOAForm } from '../utils/generateCOAForm.js';
 import * as XLSX from 'xlsx';
 
 function Properties() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [toast, setToast] = useState(null);
+  const [coaPreview, setCoaPreview] = useState({ asset: null, transactions: [] });
   const tableRef = React.useRef(null);
   const [assets, setAssets] = useState(() => {
     const savedAssets = localStorage.getItem('denr_assets');
@@ -120,6 +123,7 @@ function Properties() {
               usefulLife: newAsset.usefulLife,
               depreciableAmount: parseFloat(newAsset.depreciationAmount) || 0,
               annualDepreciation: parseFloat(newAsset.annualDepreciation) || 0,
+              rateOfDepreciation: parseFloat(newAsset.rateOfDepreciation) || 0,
               accumulatedDepreciation: parseFloat(newAsset.accumulatedDepreciation) || 0,
               netBookValue: parseFloat(newAsset.netbookValue) || 0,
               remarks: newAsset.remarks || '',
@@ -144,6 +148,7 @@ function Properties() {
         usefulLife: newAsset.usefulLife,
         depreciableAmount: parseFloat(newAsset.depreciationAmount) || 0,
         annualDepreciation: parseFloat(newAsset.annualDepreciation) || 0,
+        rateOfDepreciation: parseFloat(newAsset.rateOfDepreciation) || 0,
         accumulatedDepreciation: parseFloat(newAsset.accumulatedDepreciation) || 0,
         netBookValue: parseFloat(newAsset.netbookValue) || 0,
         remarks: newAsset.remarks || '',
@@ -187,8 +192,28 @@ function Properties() {
   };
 
   const handleGenerateCOA = (asset) => {
-    console.log('Generate COA Form for:', asset);
-    // TODO: Implement COA form generation
+    // Load transactions for this property
+    const savedTransactions = localStorage.getItem('denr_transactions');
+    const allTransactions = savedTransactions ? JSON.parse(savedTransactions) : [];
+    
+    // Filter transactions for this property
+    const propertyTransactions = allTransactions.filter(
+      transaction => transaction.propertyNumber === asset.propertyNumber
+    );
+    
+    // Show preview modal
+    setCoaPreview({ asset, transactions: propertyTransactions });
+  };
+
+  const handleDownloadCOA = () => {
+    try {
+      const fileName = generateCOAForm(coaPreview.asset, coaPreview.transactions);
+      setToast({ message: `COA Form downloaded successfully: ${fileName}`, type: 'success' });
+      setCoaPreview({ asset: null, transactions: [] });
+    } catch (error) {
+      console.error('Error generating COA Form:', error);
+      setToast({ message: 'Error generating COA Form', type: 'error' });
+    }
   };
 
   const handleToggleStatus = (asset) => {
@@ -664,15 +689,49 @@ function Properties() {
               >
                 Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
-                >
-                  {page}
-                </button>
-              ))}
+              {(() => {
+                const maxVisiblePages = 4;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+                
+                const pages = [];
+                if (startPage > 1) {
+                  pages.push(1);
+                  if (startPage > 2) {
+                    pages.push('...');
+                  }
+                }
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(i);
+                }
+                
+                if (endPage < totalPages) {
+                  if (endPage < totalPages - 1) {
+                    pages.push('...');
+                  }
+                  pages.push(totalPages);
+                }
+                
+                return pages.map((page, index) => {
+                  if (page === '...') {
+                    return <span key={`ellipsis-${index}`} className="px-3 py-2">...</span>;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {page}
+                    </button>
+                  );
+                });
+              })()}
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
@@ -697,6 +756,13 @@ function Properties() {
         }
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      <COAPreviewModal
+        asset={coaPreview.asset}
+        transactions={coaPreview.transactions}
+        onClose={() => setCoaPreview({ asset: null, transactions: [] })}
+        onDownload={handleDownloadCOA}
       />
 
       {toast && (
