@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FileText, X, Download } from 'lucide-react';
 
 function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
   const scrollPositionRef = React.useRef(0);
+  const [selectedFormat, setSelectedFormat] = useState('excel');
 
   // Handle ESC key press
   useEffect(() => {
@@ -67,7 +68,7 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
           <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-6">
             {/* Header Section */}
             <div className="text-center mb-6">
@@ -273,20 +274,35 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onDownload}
-            className="px-4 py-2 bg-denr-green text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Download Form
-          </button>
+        <div className="flex justify-between items-center p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Download as:</label>
+            <select
+              value={selectedFormat}
+              onChange={(e) => setSelectedFormat(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-denr-green"
+            >
+              <option value="excel">Excel (.xlsx)</option>
+              <option value="pdf">PDF (.pdf)</option>
+              <option value="csv">CSV (.csv)</option>
+              <option value="word">Word (.docx)</option>
+            </select>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onDownload(selectedFormat)}
+              className="px-4 py-2 bg-denr-green text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
+          </div>
         </div>
       </div>
     </div>
