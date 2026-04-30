@@ -234,7 +234,7 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
                       rows.push(
                         <tr key={year}>
                           <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{yearEnd.toISOString().split('T')[0]}</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">Annual Accumulated Depreciation</td>
+                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.propertyDescription || ''}</td>
                           <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
                           <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
                           <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
