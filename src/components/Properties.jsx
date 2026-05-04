@@ -127,7 +127,8 @@ function Properties() {
               accumulatedDepreciation: parseFloat(newAsset.accumulatedDepreciation) || 0,
               netBookValue: parseFloat(newAsset.netbookValue) || 0,
               remarks: newAsset.remarks || '',
-              status: newAsset.status
+              status: newAsset.status,
+              fundCluster: newAsset.fundCluster || ''
             }
           : asset
       ));

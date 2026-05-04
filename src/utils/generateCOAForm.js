@@ -496,27 +496,32 @@ const applyPythonStyle = (worksheet, asset, data) => {
   // K13:L13 - Repair History
   worksheet['!merges'].push({ s: { r: 12, c: 10 }, e: { r: 12, c: 11 } });
   
-  // Populate data
-  if (asset.officePlace) {
-    const c7Cell = worksheet['C7'];
-    if (c7Cell) {
-      c7Cell.v = asset.officePlace;
-      c7Cell.s = {
-        font: { name: 'Times New Roman', sz: 11 },
-        alignment: { horizontal: 'left', vertical: 'center' }
-      };
-    }
+  // Force populate Entity Name with PENRO as default
+  // Create cell if it doesn't exist
+  if (!worksheet['C7']) {
+    worksheet['C7'] = { t: 's', v: '', s: {} };
   }
   
+  // Always set PENRO as Entity Name
+  worksheet['C7'].v = 'PENRO';
+  worksheet['C7'].s = {
+    font: { name: 'Times New Roman', sz: 11 },
+    alignment: { horizontal: 'left', vertical: 'center' }
+  };
+  
+  // Force populate Fund Cluster if it exists
   if (asset.fundCluster) {
-    const k7Cell = worksheet['K7'];
-    if (k7Cell) {
-      k7Cell.v = asset.fundCluster;
-      k7Cell.s = {
-        font: { name: 'Times New Roman', sz: 11 },
-        alignment: { horizontal: 'left', vertical: 'center' }
-      };
+    // Create cell if it doesn't exist
+    if (!worksheet['K7']) {
+      worksheet['K7'] = { t: 's', v: '', s: {} };
     }
+    
+    // Set fund cluster value
+    worksheet['K7'].v = asset.fundCluster;
+    worksheet['K7'].s = {
+      font: { name: 'Times New Roman', sz: 11 },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    };
   }
   
   // Populate missing fields in correct cells (preserve labels)

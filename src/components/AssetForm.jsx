@@ -75,7 +75,7 @@ function AssetForm({ isVisible, onClose, onAddAsset, editingAsset }) {
         accountCode: editingAsset.accountCode || '',
         usefulLife: editingAsset.usefulLife || '',
         office: editingAsset.officePlace || '',
-        fundCluster: '',
+        fundCluster: editingAsset.fundCluster || '',
         status: editingAsset.status || 'Serviceable',
         unitCost: editingAsset.cost ? (editingAsset.cost / (editingAsset.quantity || 1)).toString() : '',
         quantity: editingAsset.quantity || '1',
