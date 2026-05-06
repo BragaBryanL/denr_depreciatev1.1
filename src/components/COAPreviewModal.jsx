@@ -5,6 +5,141 @@ import { FileText, X, Download } from 'lucide-react';
 function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
   const scrollPositionRef = React.useRef(0);
   const [selectedFormat, setSelectedFormat] = useState('excel');
+  const [depreciationView, setDepreciationView] = useState('yearly');
+  
+  // Load issues-transfers data
+  const [issuesTransfers, setIssuesTransfers] = useState(() => {
+    const savedIssuesTransfers = localStorage.getItem('denr_issues_transfers');
+    return savedIssuesTransfers ? JSON.parse(savedIssuesTransfers) : [];
+  });
+
+  // Generate table rows based on depreciation view
+  const generateTableRows = () => {
+    if (!asset.dateAcquired || !asset.annualDepreciation || !asset.cost) {
+      return (
+        <tr>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.dateAcquired || ''}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-center">1</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        </tr>
+      );
+    }
+
+    const acquiredDate = new Date(asset.dateAcquired);
+    const currentDate = new Date();
+    const startYear = acquiredDate.getFullYear();
+    const endYear = currentDate.getFullYear();
+    const annualDepreciation = parseFloat(asset.annualDepreciation) || 0;
+    const totalCost = parseFloat(asset.cost) || 0;
+    const usefulLife = parseFloat(asset.usefulLife) || 1;
+
+    const rows = [];
+
+    // Always show initial acquisition row
+    rows.push(
+      <tr key="acquisition">
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.dateAcquired || ''}</td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-center">1</td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+      </tr>
+    );
+
+    // Generate depreciation rows based on view
+    if (depreciationView === 'yearly') {
+      // Show all yearly depreciation
+      for (let year = startYear; year <= endYear; year++) {
+        const yearEnd = new Date(year, 11, 31);
+        
+        if (yearEnd < acquiredDate) continue;
+        
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        rows.push(
+          <tr key={year}>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{yearEnd.toISOString().split('T')[0]}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{accumulatedDepreciation.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{netBookValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          </tr>
+        );
+      }
+    } else if (depreciationView === 'summary') {
+      // Show only current accumulated depreciation summary
+      const timeElapsed = Math.max(0, (currentDate - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+      const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+      const netBookValue = totalCost - accumulatedDepreciation;
+      
+      rows.push(
+        <tr key="summary">
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{currentDate.toISOString().split('T')[0]}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{accumulatedDepreciation.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{netBookValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+        </tr>
+      );
+    } else if (depreciationView === 'current-year') {
+      // Show only current year depreciation
+      const currentYear = currentDate.getFullYear();
+      const yearEnd = new Date(currentYear, 11, 31);
+      
+      if (yearEnd >= acquiredDate) {
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        rows.push(
+          <tr key="current-year">
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{yearEnd.toISOString().split('T')[0]}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{accumulatedDepreciation.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{netBookValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+          </tr>
+        );
+      }
+    }
+    // acquisition-only shows only the initial acquisition row (already added above)
+
+    return rows;
+  };
 
   // Handle ESC key press
   useEffect(() => {
@@ -162,6 +297,7 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
               </div>
             </div>
 
+            
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -191,69 +327,27 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Initial Acquisition Row */}
-                  <tr>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.dateAcquired || ''}</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.propertyDescription || ''}</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-center">1</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{(parseFloat(asset.cost) || 0).toLocaleString('en-PH')}</td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
-                    <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                  </tr>
-
-                  {/* Yearly Depreciation Rows */}
-                  {(() => {
-                    if (!asset.dateAcquired || !asset.annualDepreciation || !asset.cost) return null;
-                    
-                    const acquiredDate = new Date(asset.dateAcquired);
-                    const currentDate = new Date();
-                    const startYear = acquiredDate.getFullYear();
-                    const endYear = currentDate.getFullYear();
-                    const annualDepreciation = parseFloat(asset.annualDepreciation) || 0;
-                    const totalCost = parseFloat(asset.cost) || 0;
-                    const usefulLife = parseFloat(asset.usefulLife) || 1;
-                    
-                    const rows = [];
-                    
-                    for (let year = startYear; year <= endYear; year++) {
-                      const yearEnd = new Date(year, 11, 31); // December 31 of each year
-                      
-                      // Skip if year end is before acquisition date
-                      if (yearEnd < acquiredDate) continue;
-                      
-                      // Calculate time elapsed from acquisition to year end
-                      const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
-                      const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95); // Max 95% depreciation
-                      const netBookValue = totalCost - accumulatedDepreciation;
-                      
-                      rows.push(
-                        <tr key={year}>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{yearEnd.toISOString().split('T')[0]}</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{asset.propertyDescription || ''}</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{accumulatedDepreciation.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱{netBookValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
-                          <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm text-right">₱0</td>
-                        </tr>
-                      );
-                    }
-                    
-                    return rows;
-                  })()}
-
+                  {generateTableRows()}
+                  
+                  {/* Issues & Transfers Rows */}
+                  {issuesTransfers && issuesTransfers.length > 0 && issuesTransfers.filter(issue => issue.propertyNumber === asset.propertyNumber).map((issue, index) => (
+                    <tr key={`issue-${index}`}>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{issue.date || ''}</td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{issue.accountableUser}</td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{issue.parNumber}</td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
+                    </tr>
+                  ))}
+                  
                   {/* Repair History Rows */}
                   {transactions && transactions.length > 0 && transactions.map((transaction, index) => (
-                    <tr key={index}>
+                    <tr key={`repair-${index}`}>
                       <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">{transaction.date || ''}</td>
                       <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm">Repair/Maintenance</td>
                       <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-sm"></td>
@@ -275,18 +369,33 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
 
         {/* Footer */}
         <div className="flex justify-between items-center p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Download as:</label>
-            <select
-              value={selectedFormat}
-              onChange={(e) => setSelectedFormat(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-denr-green"
-            >
-              <option value="excel">Excel (.xlsx)</option>
-              <option value="pdf">PDF (.pdf)</option>
-              <option value="csv">CSV (.csv)</option>
-              <option value="word">Word (.docx)</option>
-            </select>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Depreciation View:</label>
+              <select
+                value={depreciationView}
+                onChange={(e) => setDepreciationView(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-denr-green"
+              >
+                <option value="yearly">Yearly Depreciation</option>
+                <option value="summary">Summary View</option>
+                <option value="acquisition-only">Acquisition Only</option>
+                <option value="current-year">Current Year Only</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Download as:</label>
+              <select
+                value={selectedFormat}
+                onChange={(e) => setSelectedFormat(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-denr-green"
+              >
+                <option value="excel">Excel (.xlsx)</option>
+                <option value="pdf">PDF (.pdf)</option>
+                <option value="csv">CSV (.csv)</option>
+                <option value="word">Word (.docx)</option>
+              </select>
+            </div>
           </div>
           <div className="flex gap-3">
             <button
@@ -296,7 +405,7 @@ function COAPreviewModal({ asset, transactions, onClose, onDownload }) {
               Cancel
             </button>
             <button
-              onClick={() => onDownload(selectedFormat)}
+              onClick={() => onDownload(selectedFormat, depreciationView)}
               className="px-4 py-2 bg-denr-green text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
             >
               <Download className="w-4 h-4" />

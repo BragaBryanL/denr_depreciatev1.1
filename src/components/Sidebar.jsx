@@ -4,7 +4,8 @@ import {
   Plus, 
   List, 
   FileText, 
-  Settings 
+  Settings,
+  ArrowRightLeft 
 } from 'lucide-react';
 
 function Sidebar({ activeView, setActiveView }) {
@@ -12,6 +13,7 @@ function Sidebar({ activeView, setActiveView }) {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'add-asset', label: 'Add Asset', icon: Plus },
     { id: 'assets', label: 'Asset List', icon: List },
+    { id: 'issues-transfers', label: 'Issues & Transfers', icon: ArrowRightLeft },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

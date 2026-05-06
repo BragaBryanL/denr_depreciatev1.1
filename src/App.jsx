@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard.jsx';
 import Properties from './components/Properties.jsx';
 import Reports from './components/Reports.jsx';
 import RepairMaintenance from './components/RepairMaintenance.jsx';
+import IssuesTransfers from './components/IssuesTransfers.jsx';
 import Login from './components/Login.jsx';
 import Modal from './components/Modal.jsx';
 
@@ -56,7 +57,7 @@ function App() {
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const sections = ['dashboard', 'properties', 'repair-maintenance', 'reports', 'settings'];
+          const sections = ['dashboard', 'properties', 'repair-maintenance', 'issues-transfers', 'reports', 'settings'];
           const scrollPosition = window.scrollY + 100;
 
           for (const section of sections) {
@@ -247,6 +248,18 @@ function App() {
                 }`}
               >
                 Repair & Maintenance
+              </button>
+              <button
+                onClick={() => scrollToSection('issues-transfers')}
+                className={`rounded-lg font-medium transition-all duration-200 ${
+                  isMinimized ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'
+                } ${
+                  activeSection === 'issues-transfers' 
+                    ? 'bg-white text-denr-green shadow-md' 
+                    : 'text-white hover:bg-white/20 hover:text-white'
+                }`}
+              >
+                Issues & Transfers
               </button>
               <button
                 onClick={() => scrollToSection('reports')}
@@ -441,6 +454,13 @@ function App() {
         {/* Repair and Maintenance Section */}
         <section id="repair-maintenance" className="min-h-screen pt-8 pb-12">
           <RepairMaintenance />
+        </section>
+
+        <hr className="my-8 border-gray-300 dark:border-gray-700" />
+
+        {/* Issues & Transfers Section */}
+        <section id="issues-transfers" className="min-h-screen pt-8 pb-12">
+          <IssuesTransfers />
         </section>
 
         <hr className="my-8 border-gray-300 dark:border-gray-700" />

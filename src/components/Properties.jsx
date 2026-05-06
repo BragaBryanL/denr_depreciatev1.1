@@ -206,9 +206,9 @@ function Properties() {
     setCoaPreview({ asset, transactions: propertyTransactions });
   };
 
-  const handleDownloadCOA = (format = 'excel') => {
+  const handleDownloadCOA = (format = 'excel', depreciationView = 'yearly') => {
     try {
-      const fileName = generateCOAForm(coaPreview.asset, coaPreview.transactions, format);
+      const fileName = generateCOAForm(coaPreview.asset, coaPreview.transactions, format, depreciationView);
       setToast({ message: `COA Form downloaded successfully: ${fileName}`, type: 'success' });
       setCoaPreview({ asset: null, transactions: [] });
     } catch (error) {

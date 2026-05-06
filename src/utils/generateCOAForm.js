@@ -3,22 +3,25 @@ import jsPDF from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip, convertMillimetersToTwip } from 'docx';
 
-export const generateCOAForm = (asset, transactions = [], format = 'excel') => {
+export const generateCOAForm = (asset, transactions = [], format = 'excel', depreciationView = 'yearly') => {
   const baseFileName = `COA_Form_${asset.propertyNumber || 'Property'}_${new Date().toISOString().split('T')[0]}`;
   
+  // Load issues-transfers data
+  const issuesTransfers = JSON.parse(localStorage.getItem('denr_issues_transfers') || '[]');
+  
   if (format === 'pdf') {
-    return generatePDF(asset, transactions, baseFileName);
+    return generatePDF(asset, transactions, baseFileName, depreciationView, issuesTransfers);
   }
   
   if (format === 'word') {
-    return generateWord(asset, transactions, baseFileName);
+    return generateWord(asset, transactions, baseFileName, depreciationView, issuesTransfers);
   }
   
   // Excel, CSV generation
-  return generateExcel(asset, transactions, format, baseFileName);
+  return generateExcel(asset, transactions, format, baseFileName, depreciationView, issuesTransfers);
 };
 
-const generatePDF = (asset, transactions, baseFileName) => {
+const generatePDF = (asset, transactions, baseFileName, depreciationView, issuesTransfers) => {
   // Use landscape orientation for better table fit
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -108,7 +111,7 @@ const generatePDF = (asset, transactions, baseFileName) => {
   // Initial acquisition row
   tableData.push([
     asset.dateAcquired || '',
-    asset.propertyDescription || '',
+    '',
     '1',
     (parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0).toFixed(2),
     (parseFloat(asset.cost) || 0).toFixed(2),
@@ -140,7 +143,7 @@ const generatePDF = (asset, transactions, baseFileName) => {
       
       tableData.push([
         yearEnd.toISOString().split('T')[0],
-        asset.propertyDescription || '',
+        '',
         '',
         '',
         '',
@@ -249,7 +252,7 @@ const generatePDF = (asset, transactions, baseFileName) => {
   return fileName;
 };
 
-const generateExcel = (asset, transactions, format, baseFileName) => {
+const generateExcel = (asset, transactions, format, baseFileName, depreciationView, issuesTransfers) => {
   // Create a new workbook
   const workbook = XLSX.utils.book_new();
   
@@ -287,7 +290,7 @@ const generateExcel = (asset, transactions, format, baseFileName) => {
   data.push([
     null,
     asset.dateAcquired || '',
-    asset.propertyDescription || '',
+    '',
     '1',
     parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0,
     parseFloat(asset.cost) || 0,
@@ -299,7 +302,7 @@ const generateExcel = (asset, transactions, format, baseFileName) => {
     ''
   ]);
   
-  // Add yearly depreciation rows
+  // Add yearly depreciation rows based on view
   if (asset.dateAcquired && asset.annualDepreciation && asset.cost) {
     const acquiredDate = new Date(asset.dateAcquired);
     const currentDate = new Date();
@@ -308,21 +311,42 @@ const generateExcel = (asset, transactions, format, baseFileName) => {
     const annualDepreciation = parseFloat(asset.annualDepreciation) || 0;
     const totalCost = parseFloat(asset.cost) || 0;
     
-    for (let year = startYear; year <= endYear; year++) {
-      const yearEnd = new Date(year, 11, 31); // December 31 of each year
-      
-      // Skip if year end is before acquisition date
-      if (yearEnd < acquiredDate) continue;
-      
-      // Calculate time elapsed from acquisition to year end
-      const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
-      const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95); // Max 95% depreciation
+    if (depreciationView === 'yearly') {
+      // Show all yearly depreciation
+      for (let year = startYear; year <= endYear; year++) {
+        const yearEnd = new Date(year, 11, 31);
+        
+        if (yearEnd < acquiredDate) continue;
+        
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        data.push([
+          null,
+          yearEnd.toISOString().split('T')[0],
+          '',
+          '',
+          '',
+          '',
+          accumulatedDepreciation,
+          '',
+          '',
+          netBookValue,
+          '',
+          ''
+        ]);
+      }
+    } else if (depreciationView === 'summary') {
+      // Show only current accumulated depreciation summary
+      const timeElapsed = Math.max(0, (currentDate - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+      const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
       const netBookValue = totalCost - accumulatedDepreciation;
       
       data.push([
         null,
-        yearEnd.toISOString().split('T')[0],
-        asset.propertyDescription || '',
+        currentDate.toISOString().split('T')[0],
+        '',
         '',
         '',
         '',
@@ -333,7 +357,53 @@ const generateExcel = (asset, transactions, format, baseFileName) => {
         '',
         ''
       ]);
+    } else if (depreciationView === 'current-year') {
+      // Show only current year depreciation
+      const currentYear = currentDate.getFullYear();
+      const yearEnd = new Date(currentYear, 11, 31);
+      
+      if (yearEnd >= acquiredDate) {
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        data.push([
+          null,
+          yearEnd.toISOString().split('T')[0],
+          '',
+          '',
+          '',
+          '',
+          accumulatedDepreciation,
+          '',
+          '',
+          netBookValue,
+          '',
+          ''
+        ]);
+      }
     }
+    // acquisition-only shows only the initial acquisition row (already added above)
+  }
+  
+  // Add issues & transfers transactions if any
+  if (issuesTransfers && issuesTransfers.length > 0) {
+    issuesTransfers.filter(issue => issue.propertyNumber === asset.propertyNumber).forEach((issue) => {
+      data.push([
+        null,
+        issue.date || '',
+        issue.accountableUser || '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        issue.parNumber || '',
+        '',
+        ''
+      ]);
+    });
   }
   
   // Add repair history transactions if any
@@ -644,7 +714,7 @@ const applyTableBorders = (worksheet, data) => {
   }
 };
 
-const generateWord = (asset, transactions, baseFileName) => {
+const generateWord = (asset, transactions, baseFileName, depreciationView, issuesTransfers) => {
   // Create table data similar to Excel but for Word
   const tableData = [];
   
@@ -675,7 +745,7 @@ const generateWord = (asset, transactions, baseFileName) => {
   // Initial acquisition row
   tableData.push([
     new TableCell({ children: [new Paragraph(asset.dateAcquired || '')], width: { size: convertMillimetersToTwip(20) } }),
-    new TableCell({ children: [new Paragraph(asset.propertyDescription || '')], width: { size: convertMillimetersToTwip(30) } }),
+    new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(30) } }),
     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "1    " + (parseFloat(asset.unitCost) || parseFloat(asset.cost) || 0).toFixed(2) + "    " + (parseFloat(asset.cost) || 0).toFixed(2) })] })], width: { size: convertMillimetersToTwip(50) } }),
     new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
     new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
@@ -684,7 +754,7 @@ const generateWord = (asset, transactions, baseFileName) => {
     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "    0.00" })] })], width: { size: convertMillimetersToTwip(42) } })
   ]);
   
-  // Yearly depreciation rows
+  // Generate depreciation rows based on view
   if (asset.dateAcquired && asset.annualDepreciation && asset.cost) {
     const acquiredDate = new Date(asset.dateAcquired);
     const currentDate = new Date();
@@ -693,18 +763,37 @@ const generateWord = (asset, transactions, baseFileName) => {
     const annualDepreciation = parseFloat(asset.annualDepreciation) || 0;
     const totalCost = parseFloat(asset.cost) || 0;
     
-    for (let year = startYear; year <= endYear; year++) {
-      const yearEnd = new Date(year, 11, 31);
-      
-      if (yearEnd < acquiredDate) continue;
-      
-      const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+    if (depreciationView === 'yearly') {
+      // Show all yearly depreciation
+      for (let year = startYear; year <= endYear; year++) {
+        const yearEnd = new Date(year, 11, 31);
+        
+        if (yearEnd < acquiredDate) continue;
+        
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        tableData.push([
+          new TableCell({ children: [new Paragraph(yearEnd.toISOString().split('T')[0])], width: { size: convertMillimetersToTwip(20) } }),
+          new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(30) } }),
+          new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(50) } }),
+          new TableCell({ children: [new Paragraph(accumulatedDepreciation.toFixed(2))], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph(netBookValue.toFixed(2))], width: { size: convertMillimetersToTwip(30) } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "    0.00" })] })], width: { size: convertMillimetersToTwip(42) } })
+        ]);
+      }
+    } else if (depreciationView === 'summary') {
+      // Show only current accumulated depreciation summary
+      const timeElapsed = Math.max(0, (currentDate - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
       const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
       const netBookValue = totalCost - accumulatedDepreciation;
       
       tableData.push([
-        new TableCell({ children: [new Paragraph(yearEnd.toISOString().split('T')[0])], width: { size: convertMillimetersToTwip(20) } }),
-        new TableCell({ children: [new Paragraph(asset.propertyDescription || '')], width: { size: convertMillimetersToTwip(30) } }),
+        new TableCell({ children: [new Paragraph(currentDate.toISOString().split('T')[0])], width: { size: convertMillimetersToTwip(20) } }),
+        new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(30) } }),
         new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(50) } }),
         new TableCell({ children: [new Paragraph(accumulatedDepreciation.toFixed(2))], width: { size: convertMillimetersToTwip(35) } }),
         new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
@@ -712,7 +801,29 @@ const generateWord = (asset, transactions, baseFileName) => {
         new TableCell({ children: [new Paragraph(netBookValue.toFixed(2))], width: { size: convertMillimetersToTwip(30) } }),
         new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "    0.00" })] })], width: { size: convertMillimetersToTwip(42) } })
       ]);
+    } else if (depreciationView === 'current-year') {
+      // Show only current year depreciation
+      const currentYear = currentDate.getFullYear();
+      const yearEnd = new Date(currentYear, 11, 31);
+      
+      if (yearEnd >= acquiredDate) {
+        const timeElapsed = Math.max(0, (yearEnd - acquiredDate) / (365.25 * 24 * 60 * 60 * 1000));
+        const accumulatedDepreciation = Math.min(annualDepreciation * timeElapsed, totalCost * 0.95);
+        const netBookValue = totalCost - accumulatedDepreciation;
+        
+        tableData.push([
+          new TableCell({ children: [new Paragraph(yearEnd.toISOString().split('T')[0])], width: { size: convertMillimetersToTwip(20) } }),
+          new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(30) } }),
+          new TableCell({ children: [new Paragraph('')], width: { size: convertMillimetersToTwip(50) } }),
+          new TableCell({ children: [new Paragraph(accumulatedDepreciation.toFixed(2))], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph('0.00')], width: { size: convertMillimetersToTwip(35) } }),
+          new TableCell({ children: [new Paragraph(netBookValue.toFixed(2))], width: { size: convertMillimetersToTwip(30) } }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "    0.00" })] })], width: { size: convertMillimetersToTwip(42) } })
+        ]);
+      }
     }
+    // acquisition-only shows only the initial acquisition row (already added above)
   }
   
   // Repair history rows
