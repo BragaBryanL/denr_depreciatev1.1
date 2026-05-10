@@ -1,0 +1,785 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Filter, Download, Edit, Trash2, FileText, Package, Wrench, Building, Tag, FileText as FileIcon, Calendar } from 'lucide-react';
+import Modal from './Modal.jsx';
+import ConfirmationDialog from './ConfirmationDialog.jsx';
+
+function RepairMaintenance() {
+  const tableRef = React.useRef(null);
+  const [transactions, setTransactions] = useState(() => {
+    const savedTransactions = localStorage.getItem('denr_transactions');
+    return savedTransactions ? JSON.parse(savedTransactions) : [];
+  });
+
+  // Save transactions to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('denr_transactions', JSON.stringify(transactions));
+  }, [transactions]);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [selectedTransactions, setSelectedTransactions] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    transaction: null,
+    isBulk: false
+  });
+  const [formData, setFormData] = useState({
+    propertyNumber: '',
+    natureOfRepair: '',
+    supplier: '',
+    amount: '',
+    poNumber: '',
+    date: ''
+  });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSelectTransaction = (id) => {
+    setSelectedTransactions(prev => 
+      prev.includes(id) ? prev.filter(transId => transId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTransactions = () => {
+    if (selectedTransactions.length === paginatedTransactions.length) {
+      setSelectedTransactions([]);
+    } else {
+      setSelectedTransactions(paginatedTransactions.map(transaction => transaction.id));
+    }
+  };
+
+  const handleDeleteSelectedTransactions = () => {
+    if (selectedTransactions.length === 0) return;
+    setDeleteConfirmation({
+      isOpen: true,
+      transaction: null,
+      isBulk: true
+    });
+  };
+
+  // ESC key to deselect all (only if no modal is open)
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        const modal = document.querySelector('.fixed.inset-0.z-\\[999999\\]');
+        if (!modal) {
+          setSelectedTransactions([]);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, []);
+
+  const filteredTransactions = transactions.filter(transaction =>
+    transaction.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    transaction.natureOfRepair.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalAmount = filteredTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Scroll to table when page changes
+  useEffect(() => {
+    if (tableRef.current) {
+      tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.propertyNumber.trim()) {
+      newErrors.propertyNumber = 'Property number is required';
+    }
+    
+    if (!formData.natureOfRepair.trim()) {
+      newErrors.natureOfRepair = 'Nature of repair is required';
+    }
+    
+    if (!formData.supplier.trim()) {
+      newErrors.supplier = 'Supplier is required';
+    }
+    
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      newErrors.amount = 'Valid amount is required';
+    }
+    
+    if (!formData.poNumber.trim()) {
+      newErrors.poNumber = 'PO number is required';
+    }
+    
+    if (!formData.date) {
+      newErrors.date = 'Date is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAddTransaction = (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      if (editingTransaction) {
+        // Update existing transaction
+        setTransactions(prev => prev.map(t => 
+          t.id === editingTransaction.id 
+            ? {
+                ...t,
+                propertyNumber: formData.propertyNumber,
+                natureOfRepair: formData.natureOfRepair,
+                supplier: formData.supplier,
+                amount: parseFloat(formData.amount),
+                poNumber: formData.poNumber,
+                date: formData.date,
+                updatedAt: new Date().toISOString()
+              }
+            : t
+        ));
+        setEditingTransaction(null);
+      } else {
+        // Add new transaction
+        const newTransaction = {
+          id: Date.now().toString(),
+          propertyNumber: formData.propertyNumber,
+          natureOfRepair: formData.natureOfRepair,
+          supplier: formData.supplier,
+          amount: parseFloat(formData.amount),
+          poNumber: formData.poNumber,
+          date: formData.date,
+          status: 'Pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        setTransactions([...transactions, newTransaction]);
+      }
+      
+      setIsModalOpen(false);
+      setFormData({
+        propertyNumber: '',
+        natureOfRepair: '',
+        supplier: '',
+        amount: '',
+        poNumber: '',
+        date: ''
+      });
+      setIsSubmitting(false);
+      setErrors({});
+      // Dispatch custom event for real-time updates
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    }, 500);
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setFormData({
+      propertyNumber: transaction.propertyNumber,
+      natureOfRepair: transaction.natureOfRepair,
+      supplier: transaction.supplier,
+      amount: transaction.amount.toString(),
+      poNumber: transaction.poNumber,
+      date: transaction.date
+    });
+    setErrors({});
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (transaction) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      transaction: transaction,
+      isBulk: false
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmation.isBulk) {
+      // Bulk delete
+      setTransactions(prev => prev.filter(transaction => !selectedTransactions.includes(transaction.id)));
+      setSelectedTransactions([]);
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    } else {
+      // Individual delete
+      const transaction = deleteConfirmation.transaction;
+      setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+      window.dispatchEvent(new CustomEvent('denrDataChanged'));
+    }
+  };
+
+  const exportToCSV = () => {
+    const csvContent = [
+      ['Property #', 'Nature of Repair and Maintenance', 'Supplier', 'Amount', 'PO Number', 'Date'],
+      ...filteredTransactions.map(t => [
+        t.propertyNumber,
+        t.natureOfRepair,
+        t.supplier,
+        t.amount,
+        t.poNumber,
+        t.date
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'repair_maintenance_transactions.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header and Add Button */}
+      <div className="denr-card">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-denr-green">Repair and Maintenance Transactions</h2>
+          <button
+            onClick={() => {
+              setEditingTransaction(null);
+              setFormData({
+                propertyNumber: '',
+                natureOfRepair: '',
+                supplier: '',
+                amount: '',
+                poNumber: '',
+                date: new Date().toISOString().split('T')[0]
+              });
+              setErrors({});
+              setIsModalOpen(true);
+            }}
+            className="denr-button flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Transaction</span>
+          </button>
+        </div>
+
+        {/* Summary Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="denr-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Transactions</p>
+                <p className="text-2xl font-bold text-denr-green">{filteredTransactions.length}</p>
+              </div>
+              <div className="p-3 bg-denr-light rounded-full">
+                <FileText className="w-6 h-6 text-denr-green" />
+              </div>
+            </div>
+          </div>
+
+          <div className="denr-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Amount</p>
+                <p className="text-2xl font-bold text-denr-green">
+                  ₱ {totalAmount.toLocaleString('en-PH')}
+                </p>
+              </div>
+              <div className="p-3 bg-denr-light rounded-full">
+                <Filter className="w-6 h-6 text-denr-green" />
+              </div>
+            </div>
+          </div>
+
+          <div className="denr-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Average Amount</p>
+                <p className="text-2xl font-bold text-denr-green">
+                  ₱ {filteredTransactions.length > 0 ? (totalAmount / filteredTransactions.length).toLocaleString('en-PH') : '0'}
+                </p>
+              </div>
+              <div className="p-3 bg-denr-light rounded-full">
+                <Filter className="w-6 h-6 text-denr-green" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Export */}
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="denr-input w-full pl-10"
+            />
+          </div>
+          <button
+            onClick={exportToCSV}
+            className="denr-button-secondary flex items-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Add Transaction Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTransaction(null);
+          setErrors({});
+          setFormData({
+            propertyNumber: '',
+            natureOfRepair: '',
+            supplier: '',
+            amount: '',
+            poNumber: '',
+            date: ''
+          });
+        }} 
+        title={editingTransaction ? "Edit Transaction" : "Add New Transaction"}
+      >
+        <form onSubmit={handleAddTransaction} className="space-y-6">
+          {/* Property Number */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-denr-green" />
+              Property Number
+              <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.propertyNumber}
+                onChange={(e) => {
+                  let formattedValue = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+                  if (formattedValue.length > 4) formattedValue = formattedValue.slice(0, 4) + '-' + formattedValue.slice(4);
+                  if (formattedValue.length > 7) formattedValue = formattedValue.slice(0, 7) + '-' + formattedValue.slice(7);
+                  if (formattedValue.length > 10) formattedValue = formattedValue.slice(0, 10) + '-' + formattedValue.slice(10);
+                  if (formattedValue.length > 15) formattedValue = formattedValue.slice(0, 15) + '-' + formattedValue.slice(15);
+                  formattedValue = formattedValue.slice(0, 18);
+                  setFormData(prev => ({...prev, propertyNumber: formattedValue}));
+                  setErrors(prev => ({...prev, propertyNumber: ''}));
+                }}
+                placeholder="0000-00-00-0000-000"
+                className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all font-mono ${
+                  errors.propertyNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+                maxLength="18"
+                required
+              />
+              <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            </div>
+            {errors.propertyNumber && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.propertyNumber}</p>
+            )}
+          </div>
+
+          {/* Nature of Repair and Maintenance */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-denr-green" />
+              Nature of Repair and Maintenance
+              <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <textarea
+                value={formData.natureOfRepair}
+                onChange={(e) => {
+                  setFormData(prev => ({...prev, natureOfRepair: e.target.value}));
+                  setErrors(prev => ({...prev, natureOfRepair: ''}));
+                }}
+                placeholder="Describe the repair or maintenance work performed..."
+                className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all resize-none ${
+                  errors.natureOfRepair ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+                rows={3}
+                required
+              />
+              <Wrench className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+            </div>
+            {errors.natureOfRepair && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.natureOfRepair}</p>
+            )}
+          </div>
+
+          {/* Supplier and Amount Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Supplier */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <Building className="w-4 h-4 text-denr-green" />
+                Supplier
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.supplier}
+                  onChange={(e) => {
+                    setFormData(prev => ({...prev, supplier: e.target.value}));
+                    setErrors(prev => ({...prev, supplier: ''}));
+                  }}
+                  placeholder="e.g., ABC Hardware Store"
+                  className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all ${
+                    errors.supplier ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  required
+                />
+                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              </div>
+              {errors.supplier && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.supplier}</p>
+              )}
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-denr-green" />
+                Amount
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) => {
+                    setFormData(prev => ({...prev, amount: e.target.value}));
+                    setErrors(prev => ({...prev, amount: ''}));
+                  }}
+                  placeholder="0.00"
+                  className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all ${
+                    errors.amount ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  step="0.01"
+                  min="0"
+                  required
+                />
+                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              </div>
+              {errors.amount && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.amount}</p>
+              )}
+            </div>
+          </div>
+
+          {/* PO Number and Date Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* PO Number */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <FileIcon className="w-4 h-4 text-denr-green" />
+                PO Number
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.poNumber}
+                  onChange={(e) => {
+                    setFormData(prev => ({...prev, poNumber: e.target.value}));
+                    setErrors(prev => ({...prev, poNumber: ''}));
+                  }}
+                  placeholder="e.g., PO-2024-001"
+                  className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all ${
+                    errors.poNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  required
+                />
+                <FileIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              </div>
+              {errors.poNumber && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.poNumber}</p>
+              )}
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-denr-green" />
+                Date
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => {
+                    setFormData(prev => ({...prev, date: e.target.value}));
+                    setErrors(prev => ({...prev, date: ''}));
+                  }}
+                  className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-denr-green dark:bg-gray-700 dark:text-gray-300 transition-all ${
+                    errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  required
+                />
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              </div>
+              {errors.date && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.date}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Transaction Preview */}
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Preview:</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Property: <span className="font-medium text-gray-900 dark:text-gray-100">{formData.propertyNumber || 'N/A'}</span>
+                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Amount: <span className="font-medium text-gray-900 dark:text-gray-100">₱{formData.amount ? parseFloat(formData.amount).toLocaleString('en-PH', {minimumFractionDigits: 2}) : '0.00'}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Supplier: <span className="font-medium text-gray-900 dark:text-gray-100">{formData.supplier || 'N/A'}</span>
+                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Date: <span className="font-medium text-gray-900 dark:text-gray-100">{formData.date || 'N/A'}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingTransaction(null);
+                setErrors({});
+              }}
+              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all font-medium"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-denr-green text-white rounded-lg hover:bg-green-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {editingTransaction ? 'Updating...' : 'Saving...'}
+                </>
+              ) : (
+                <>
+                  {editingTransaction ? 'Update Transaction' : 'Add Transaction'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Transactions Table */}
+      <div className="denr-card" ref={tableRef}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-denr-green">Transaction History</h3>
+          {selectedTransactions.length > 0 && (
+            <button
+              onClick={handleDeleteSelectedTransactions}
+              className="px-4 py-4 border border-red-300/50 dark:border-gray-600 rounded-lg cursor-pointer 
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                       focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500
+                       transition-all duration-200
+                       font-medium
+                       hover:border-red-500 dark:hover:border-red-400
+                       shadow-sm hover:shadow-md min-h-[56px]"
+            >
+              Delete Selected ({selectedTransactions.length})
+            </button>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-denr-bg">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedTransactions.length === paginatedTransactions.length && paginatedTransactions.length > 0}
+                    onChange={handleSelectAllTransactions}
+                    className="w-4 h-4 rounded border-gray-300 text-denr-green focus:ring-denr-green"
+                  />
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property #</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nature of Repair and Maintenance</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO Number</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paginatedTransactions.map((transaction) => (
+                <tr key={transaction.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={selectedTransactions.includes(transaction.id)}
+                      onChange={() => handleSelectTransaction(transaction.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-denr-green focus:ring-denr-green"
+                    />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {transaction.propertyNumber}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {transaction.natureOfRepair}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {transaction.supplier}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ₱ {transaction.amount.toLocaleString('en-PH')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {transaction.poNumber}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {transaction.date}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEditTransaction(transaction)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(transaction)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-4 px-2">
+            <div className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              {(() => {
+                const maxVisiblePages = 4;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+                
+                const pages = [];
+                if (startPage > 1) {
+                  pages.push(1);
+                  if (startPage > 2) {
+                    pages.push('...');
+                  }
+                }
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(i);
+                }
+                
+                if (endPage < totalPages) {
+                  if (endPage < totalPages - 1) {
+                    pages.push('...');
+                  }
+                  pages.push(totalPages);
+                }
+                
+                return pages.map((page, index) => {
+                  if (page === '...') {
+                    return <span key={`ellipsis-${index}`} className="px-3 py-2">...</span>;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-2 border rounded-lg ${currentPage === page ? 'bg-denr-green text-white border-denr-green' : 'border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {page}
+                    </button>
+                  );
+                });
+              })()}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false, transaction: null, isBulk: false })}
+        onConfirm={confirmDelete}
+        title={deleteConfirmation.isBulk ? 'Delete Selected Transactions' : 'Delete Transaction'}
+        message={
+          deleteConfirmation.isBulk
+            ? `Are you sure you want to delete ${selectedTransactions.length} selected transactions? This action cannot be undone.`
+            : `Are you sure you want to delete transaction ${deleteConfirmation.transaction?.propertyNumber}? This action cannot be undone.`
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+    </div>
+  );
+}
+
+export default RepairMaintenance;
